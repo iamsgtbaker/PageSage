@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Index it!</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <div>
+                    <h1>📚 Index it!</h1>
+                    <p class="subtitle" id="indexName">Create and manage your book index offline</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- Tab Navigation -->
+        <div class="tabs">
+            <button class="tab-button active" onclick="switchTab('add')">Add Entry</button>
+            <button class="tab-button" onclick="switchTab('view')">View Entries</button>
+            <button class="tab-button" onclick="switchTab('notes')">Notes</button>
+            <button class="tab-button" onclick="switchTab('books')">Books</button>
+            <button class="tab-button" onclick="switchTab('tools')">Tools</button>
+            <button class="tab-button" onclick="switchTab('settings')">Settings</button>
+        </div>
+
+        <!-- Add Entry Tab -->
+        <div id="tab-add" class="tab-content active">
+        <div class="card compact">
+            <h2>Add New Entry</h2>
+            <div id="message" class="message"></div>
+            <form id="addForm">
+                <div class="form-row">
+                    <div class="form-group form-group-term">
+                        <label for="term">Term:</label>
+                        <div class="autocomplete-wrapper">
+                            <input type="text" id="term" name="term" required
+                                   placeholder="e.g., machine learning" autofocus
+                                   autocomplete="off">
+                            <div id="autocomplete-list" class="autocomplete-items"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group form-group-ref">
+                        <label>Reference:</label>
+                        <div class="reference-inputs">
+                            <select id="book" name="book" class="ref-input book-select">
+                                <option value="">Book</option>
+                            </select>
+                            <span class="ref-separator">:</span>
+                            <input type="text" id="page" name="page"
+                                   placeholder="Start" class="ref-input" style="width: 65px;"
+                                   pattern="[0-9]*" inputmode="numeric">
+                            <span class="ref-separator">-</span>
+                            <input type="text" id="pageEnd" name="pageEnd"
+                                   placeholder="End" class="ref-input" style="width: 65px;"
+                                   pattern="[0-9]*" inputmode="numeric">
+                        </div>
+                        <small>Leave blank to add only a note</small>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="notes">Notes:</label>
+                    <textarea id="notes" name="notes" rows="3"
+                              placeholder="Enter notes about this term..."></textarea>
+                    <small>Notes are associated with the term, not specific page references</small>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Add Entry</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h3 class="collapsible-heading" onclick="toggleRecentEntries()">
+                <span id="recentEntriesToggle">-</span> Recently Added
+            </h3>
+            <div id="recentEntriesContainer" class="recent-entries-container">
+                <div id="recentEntriesList" class="recent-entries-list">
+                    <p class="loading">Loading...</p>
+                </div>
+                <div id="recentEntriesShowMore" style="display: none; margin-top: 0.5rem;">
+                    <button class="btn btn-secondary" onclick="showMoreRecentEntries()" style="width: 100%; padding: 0.35rem;">
+                        Show More
+                    </button>
+                </div>
+            </div>
+        </div>
+        </div>
+
+        <!-- View Entries Tab -->
+        <div id="tab-view" class="tab-content">
+        <div class="card">
+            <div class="toolbar">
+                <h2>Index Entries</h2>
+                <div class="toolbar-actions">
+                    <input type="text" id="searchInput" placeholder="Search terms..."
+                           class="search-box">
+                    <button onclick="refreshEntries()" class="btn btn-secondary">Refresh</button>
+                </div>
+            </div>
+            <div id="viewEntriesMessage" class="message"></div>
+
+            <!-- Filter Bar -->
+            <div class="filter-bar">
+                <label for="bookFilter">Filter by Book:</label>
+                <select id="bookFilter" class="filter-select">
+                    <option value="">All Books</option>
+                </select>
+            </div>
+
+            <!-- Letter Navigation -->
+            <div id="letterNav" class="letter-nav">
+                <!-- Will be populated by JavaScript -->
+            </div>
+
+            <div id="entriesList" class="entries-list">
+                <p class="loading">Loading...</p>
+            </div>
+
+            <div id="stats" class="stats"></div>
+        </div>
+        </div>
+
+        <!-- Notes Tab -->
+        <div id="tab-notes" class="tab-content">
+        <div class="card">
+            <div class="toolbar">
+                <h2>Notes</h2>
+                <div class="toolbar-actions">
+                    <input type="text" id="notesSearchInput" placeholder="Search notes..."
+                           class="search-box">
+                    <button onclick="refreshNotes()" class="btn btn-secondary">Refresh</button>
+                </div>
+            </div>
+
+            <div id="notesList" class="notes-list">
+                <p class="loading">Loading...</p>
+            </div>
+
+            <div id="notesStats" class="stats"></div>
+        </div>
+        </div>
+
+        <!-- Books Tab -->
+        <div id="tab-books" class="tab-content">
+        <div class="card">
+            <h2>Book Management</h2>
+            <div id="bookManagementMessage" class="message"></div>
+            <p>Manage the books in your index</p>
+
+            <div id="booksList" class="books-list"></div>
+
+            <h3>Add New Book</h3>
+            <div id="addBookMessage" class="message"></div>
+            <div class="book-form">
+                <div class="form-group">
+                    <label for="newBookNumber">Book Number:</label>
+                    <input type="text" id="newBookNumber" placeholder="1">
+                </div>
+                <div class="form-group">
+                    <label for="newBookName">Book Name:</label>
+                    <input type="text" id="newBookName" placeholder="Volume 1">
+                </div>
+                <div class="form-group">
+                    <label for="newBookPages">Page Count:</label>
+                    <input type="text" id="newBookPages" placeholder="500">
+                </div>
+                <button class="btn btn-primary" onclick="addBook()">Add Book</button>
+            </div>
+        </div>
+        </div>
+
+        <!-- Tools Tab -->
+        <div id="tab-tools" class="tab-content">
+        <!-- Import Section -->
+        <div class="card">
+            <h3 class="collapsible-heading" onclick="toggleToolsSection('import')">
+                <span id="importToggle">+</span> Import from CSV
+            </h3>
+            <div id="importContainer" class="collapsible-container collapsed">
+                <div id="importMessage" class="message"></div>
+                <p>Paste your CSV data below. Each line can have multiple references for the same term.</p>
+                <h4 class="collapsible-heading" onclick="toggleCsvFormat()" style="font-size: 1rem; margin-top: 1rem;">
+                    <span id="csvFormatToggle">+</span> CSV Format Help
+                </h4>
+                <div id="csvFormatHelp" class="collapsible-container collapsed">
+                    <p class="format-help">Format: <code>term,reference1,reference2,...</code><br>
+                    References can be: <code>book:page</code> or <code>book:start-end</code><br><br>
+                    Examples:<br>
+                    - <code>machine learning,1:42</code> (single reference)<br>
+                    - <code>neural networks,2:15-18,2:25,3:10</code> (multiple references)<br>
+                    - <code>deep learning,1:50,1:75-80</code> (mixed formats)</p>
+                </div>
+                <form id="importForm">
+                    <div class="form-group">
+                        <label for="csvData">CSV Data:</label>
+                        <textarea id="csvData" name="csvData" rows="15"
+                                  placeholder="Paste CSV data here, one entry per line&#10;Format: term,reference1,reference2,...&#10;&#10;Examples:&#10;machine learning,1:42&#10;neural networks,2:15-18,2:25,3:10&#10;deep learning,1:50,1:75-80"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Import Entries</button>
+                </form>
+                <div id="importResults" class="import-results"></div>
+            </div>
+        </div>
+
+        <!-- Export Section -->
+        <div class="card">
+            <h3 class="collapsible-heading" onclick="toggleToolsSection('export')">
+                <span id="exportToggle">+</span> Export
+            </h3>
+            <div id="exportContainer" class="collapsible-container collapsed">
+                <h4 style="margin-top: 1.5rem;">Export Index</h4>
+                <p>Download your complete index:</p>
+                <div style="display: flex; gap: 1rem; align-items: center; margin-top: 0.5rem;">
+                    <select id="indexExportFormat" class="filter-select" style="flex: 0 0 200px;">
+                        <option value="latex">LaTeX</option>
+                        <option value="pdf">PDF</option>
+                        <option value="plain">Plain Text</option>
+                        <option value="markdown">Markdown</option>
+                    </select>
+                    <button onclick="exportIndexFromDropdown()" class="btn btn-primary">
+                        Export Index
+                    </button>
+                </div>
+
+                <h4 style="margin-top: 1.5rem;">Export Notes</h4>
+                <p>Download your notes only:</p>
+                <div style="display: flex; gap: 1rem; align-items: center; margin-top: 0.5rem;">
+                    <select id="notesExportFormat" class="filter-select" style="flex: 0 0 200px;">
+                        <option value="txt">Text</option>
+                        <option value="csv">CSV</option>
+                        <option value="pdf">PDF</option>
+                    </select>
+                    <button onclick="exportNotesFromDropdown()" class="btn btn-primary">
+                        Export Notes
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gap Analysis Section -->
+        <div class="card">
+            <h3 class="collapsible-heading" onclick="toggleToolsSection('gaps')">
+                <span id="gapsToggle">+</span> Gap Analysis
+            </h3>
+            <div id="gapsContainer" class="collapsible-container collapsed">
+                <p>Identify pages that may not have been indexed for each registered book. Click on missing pages to create a reference or exclude them from the analysis.</p>
+
+                <div id="gapAnalysisResults" class="gap-results"></div>
+            </div>
+        </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="tab-settings" class="tab-content">
+        <div class="card">
+            <h2>Settings</h2>
+
+            <div class="settings-section">
+                <h3>Index Settings</h3>
+                <div id="indexSettingsMessage" class="message"></div>
+                <div class="form-group">
+                    <label for="settingsIndexName">Name:</label>
+                    <input type="text" id="settingsIndexName" placeholder="My Book Index">
+                </div>
+                <div class="form-row" style="display: flex; gap: 1rem;">
+                    <div class="form-group" style="flex: 0 0 120px;">
+                        <label for="settingsIndexYear">Year:</label>
+                        <input type="text" id="settingsIndexYear" placeholder="2026"
+                               pattern="[0-9]*" inputmode="numeric">
+                    </div>
+                    <div class="form-group" style="flex: 0 0 250px;">
+                        <label for="settingsIndexVersion">Version:</label>
+                        <input type="text" id="settingsIndexVersion" placeholder="1.0">
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="saveIndexSettings()">Save</button>
+            </div>
+
+            <div class="settings-section">
+                <h3>Database Management</h3>
+                <div class="settings-actions">
+                    <button class="btn btn-primary" onclick="backupDatabase()">
+                        💾 Backup Database
+                    </button>
+                    <button class="btn btn-danger" onclick="createNewIndex()">
+                        🗑️ Create New Index (Clear All Data)
+                    </button>
+                </div>
+                <small>Backup will download the SQLite database file</small>
+            </div>
+        </div>
+        </div>
+
+        <!-- Edit Modal -->
+        <div id="editModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Edit Reference</h2>
+                    <button class="modal-close" onclick="closeEditModal()">&times;</button>
+                </div>
+                <form id="editForm">
+                    <div class="form-group">
+                        <label for="editTerm">Term:</label>
+                        <input type="text" id="editTerm" name="editTerm">
+                    </div>
+
+                    <input type="hidden" id="editOldReference" name="editOldReference">
+
+                    <div class="form-group">
+                        <label>Updated Reference:</label>
+                        <div class="reference-inputs">
+                            <select id="editBook" name="editBook" required class="ref-input book-select">
+                                <option value="">Book</option>
+                            </select>
+                            <span class="ref-separator">:</span>
+                            <input type="text" id="editPage" name="editPage" required
+                                   placeholder="Start" class="ref-input" style="width: 65px;"
+                                   pattern="[0-9]*" inputmode="numeric">
+                            <span class="ref-separator">-</span>
+                            <input type="text" id="editPageEnd" name="editPageEnd"
+                                   placeholder="End" class="ref-input" style="width: 65px;"
+                                   pattern="[0-9]*" inputmode="numeric">
+                        </div>
+                        <small>Format: book:page or book:start-end</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="editNotes">Notes:</label>
+                        <textarea id="editNotes" name="editNotes" rows="4"
+                                  placeholder="Enter notes about this term..."></textarea>
+                        <small>Notes are associated with the term, not specific page references</small>
+                    </div>
+
+                    <div class="modal-actions">
+                        <button type="submit" class="btn btn-primary">Update</button>
+                        <button type="button" class="btn btn-danger" onclick="deleteReferenceFromModal()">Delete</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Edit Notes Modal -->
+        <div id="editNotesModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Edit Notes</h2>
+                    <button class="modal-close" onclick="closeEditNotesModal()">&times;</button>
+                </div>
+                <form id="editNotesForm">
+                    <div class="form-group">
+                        <label for="editNotesTerm">Term:</label>
+                        <input type="text" id="editNotesTerm" name="editNotesTerm" readonly>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="editNotesText">Notes:</label>
+                        <textarea id="editNotesText" name="editNotesText" rows="8"
+                                  placeholder="Enter notes about this term..."></textarea>
+                    </div>
+
+                    <div class="modal-actions">
+                        <button type="submit" class="btn btn-primary">Update</button>
+                        <button type="button" class="btn btn-danger" onclick="deleteNotesFromModal()">Delete Notes</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeEditNotesModal()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Gap Range Action Modal -->
+        <div id="gapActionModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="gapActionTitle">Missing Pages</h2>
+                    <button class="modal-close" onclick="closeGapActionModal()">&times;</button>
+                </div>
+                <div style="padding: 1rem 0;">
+                    <p id="gapActionMessage" style="margin-bottom: 1.5rem; color: var(--text-color);"></p>
+                    <div class="modal-actions" style="justify-content: center; gap: 1rem;">
+                        <button type="button" class="btn btn-primary" onclick="gapActionCreateReference()">
+                            📝 Create Reference
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="gapActionExclude()">
+                            🚫 Exclude from Analysis
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="closeGapActionModal()">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Re-include Exclusion Modal -->
+        <div id="reincludeModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="reincludeTitle">Re-include Pages</h2>
+                    <button class="modal-close" onclick="closeReincludeModal()">&times;</button>
+                </div>
+                <div style="padding: 1rem 0;">
+                    <p id="reincludeMessage" style="margin-bottom: 1.5rem; color: var(--text-color);"></p>
+                    <div class="modal-actions" style="justify-content: center; gap: 1rem;">
+                        <button type="button" class="btn btn-primary" onclick="confirmReinclude()">
+                            ✓ Re-include Pages
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="closeReincludeModal()">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Book Modal -->
+        <div id="editBookModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Edit Book</h2>
+                    <button class="modal-close" onclick="closeEditBookModal()">&times;</button>
+                </div>
+                <form id="editBookForm">
+                    <input type="hidden" id="editBookOldNumber" name="editBookOldNumber">
+
+                    <div class="form-group">
+                        <label for="editBookNumber">Book Number:</label>
+                        <input type="text" id="editBookNumber" name="editBookNumber" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="editBookName">Book Name:</label>
+                        <input type="text" id="editBookName" name="editBookName" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="editBookPages">Page Count:</label>
+                        <input type="text" id="editBookPages" name="editBookPages"
+                               pattern="[0-9]*" inputmode="numeric">
+                    </div>
+
+                    <div class="modal-actions">
+                        <button type="submit" class="btn btn-primary">Update Book</button>
+                        <button type="button" class="btn btn-danger" onclick="deleteBookFromModal()">Delete Book</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeEditBookModal()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Add Book Modal -->
+        <div id="addBookModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Add New Book</h2>
+                    <button class="modal-close" onclick="closeAddBookModal()">&times;</button>
+                </div>
+                <form id="addBookModalForm">
+                    <input type="hidden" id="addBookSource" name="addBookSource">
+
+                    <div class="form-group">
+                        <label for="addBookModalNumber">Book Number:</label>
+                        <input type="text" id="addBookModalNumber" name="addBookModalNumber" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="addBookModalName">Book Name:</label>
+                        <input type="text" id="addBookModalName" name="addBookModalName" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="addBookModalPages">Page Count:</label>
+                        <input type="text" id="addBookModalPages" name="addBookModalPages"
+                               pattern="[0-9]*" inputmode="numeric">
+                    </div>
+
+                    <div class="modal-actions">
+                        <button type="submit" class="btn btn-primary">Add Book</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeAddBookModal()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <footer>
+            <p>Index it! • <span id="rotatingTagline">Build your exam reference, fast</span></p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

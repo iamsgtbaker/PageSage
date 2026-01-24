@@ -1,0 +1,2121 @@
+// Book Index Manager - JavaScript
+
+let allEntries = [];
+let allNotes = [];
+let searchTimeout = null;
+let notesSearchTimeout = null;
+let selectedLetter = null;
+let currentSearchQuery = '';
+let autocompleteIndex = -1;
+let lastUsedBook = '';
+let selectedBookFilter = '';
+let recentEntriesOffset = 0;
+let recentEntriesLimit = 5;
+let allRecentEntries = [];
+
+// Helper function to normalize first letter
+// Numbers and special characters become "#"
+function normalizeFirstLetter(text) {
+    if (!text || text.length === 0) return '#';
+
+    const firstChar = text[0].toUpperCase();
+
+    // Check if it's a letter A-Z
+    if (firstChar >= 'A' && firstChar <= 'Z') {
+        return firstChar;
+    }
+
+    // Everything else (numbers, special characters) becomes "#"
+    return '#';
+}
+
+// Rotating tagline functionality
+const taglines = [
+    "Build your exam reference, fast",
+    "Your open-book advantage",
+    "Find it when it counts",
+    "Never flip through 800 pages again"
+];
+let currentTaglineIndex = 0;
+
+function startTaglineRotation() {
+    setInterval(() => {
+        currentTaglineIndex = (currentTaglineIndex + 1) % taglines.length;
+        const taglineElement = document.getElementById('rotatingTagline');
+        if (taglineElement) {
+            taglineElement.style.opacity = '0';
+            setTimeout(() => {
+                taglineElement.textContent = taglines[currentTaglineIndex];
+                taglineElement.style.opacity = '1';
+            }, 300);
+        }
+    }, 4000); // Rotate every 4 seconds
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadEntries();
+    loadSettings();
+    loadBookDropdowns();
+    loadRecentEntries();
+
+    // Setup form submission
+    document.getElementById('addForm').addEventListener('submit', handleAddEntry);
+    document.getElementById('editForm').addEventListener('submit', handleEditEntry);
+    document.getElementById('importForm').addEventListener('submit', handleImportCSV);
+    document.getElementById('editNotesForm').addEventListener('submit', handleEditNotes);
+    document.getElementById('editBookForm').addEventListener('submit', handleEditBook);
+    document.getElementById('addBookModalForm').addEventListener('submit', handleAddBookModal);
+
+    // Setup search
+    document.getElementById('searchInput').addEventListener('input', handleSearch);
+    document.getElementById('notesSearchInput').addEventListener('input', handleNotesSearch);
+
+    // Close modal on background click
+    document.getElementById('editModal').addEventListener('click', function(e) {
+        if (e.target.id === 'editModal') {
+            closeEditModal();
+        }
+    });
+
+    document.getElementById('editNotesModal').addEventListener('click', function(e) {
+        if (e.target.id === 'editNotesModal') {
+            closeEditNotesModal();
+        }
+    });
+
+    document.getElementById('gapActionModal').addEventListener('click', function(e) {
+        if (e.target.id === 'gapActionModal') {
+            closeGapActionModal();
+        }
+    });
+
+    document.getElementById('reincludeModal').addEventListener('click', function(e) {
+        if (e.target.id === 'reincludeModal') {
+            closeReincludeModal();
+        }
+    });
+
+    document.getElementById('editBookModal').addEventListener('click', function(e) {
+        if (e.target.id === 'editBookModal') {
+            closeEditBookModal();
+        }
+    });
+
+    document.getElementById('addBookModal').addEventListener('click', function(e) {
+        if (e.target.id === 'addBookModal') {
+            closeAddBookModal();
+        }
+    });
+
+    // Setup autocomplete
+    setupAutocomplete();
+
+    // Setup book dropdown change handlers
+    document.getElementById('book').addEventListener('change', handleBookChange);
+    document.getElementById('editBook').addEventListener('change', handleEditBookChange);
+
+    // Setup book filter
+    document.getElementById('bookFilter').addEventListener('change', handleBookFilter);
+
+    // Setup term field to auto-populate notes when term exists
+    document.getElementById('term').addEventListener('blur', handleTermBlur);
+
+    // Setup number-only validation for page fields
+    setupNumberOnlyFields();
+
+    // Setup global keyboard shortcuts
+    document.addEventListener('keydown', handleGlobalKeyboardShortcuts);
+
+    // Start rotating tagline
+    startTaglineRotation();
+});
+
+// Switch tabs
+function switchTab(tabName) {
+    // Hide all tab contents
+    const tabContents = document.querySelectorAll('.tab-content');
+    tabContents.forEach(tab => tab.classList.remove('active'));
+
+    // Remove active class from all tab buttons
+    const tabButtons = document.querySelectorAll('.tab-button');
+    tabButtons.forEach(button => button.classList.remove('active'));
+
+    // Show selected tab content
+    document.getElementById(`tab-${tabName}`).classList.add('active');
+
+    // Find and activate the correct tab button
+    tabButtons.forEach(button => {
+        const onclick = button.getAttribute('onclick');
+        if (onclick && onclick.includes(`'${tabName}'`)) {
+            button.classList.add('active');
+        }
+    });
+
+    // If switching to add tab, load recent entries
+    if (tabName === 'add') {
+        loadRecentEntries();
+    }
+
+    // If switching to view tab, refresh entries
+    if (tabName === 'view') {
+        loadEntries();
+    }
+
+    // If switching to notes tab, refresh notes
+    if (tabName === 'notes') {
+        loadNotes();
+    }
+
+    // If switching to books tab, load books
+    if (tabName === 'books') {
+        loadBooks();
+    }
+
+    // If switching to settings tab, load settings
+    if (tabName === 'settings') {
+        loadSettingsTab();
+    }
+}
+
+// Toggle recent entries section
+function toggleRecentEntries() {
+    const container = document.getElementById('recentEntriesContainer');
+    const toggle = document.getElementById('recentEntriesToggle');
+
+    if (container.classList.contains('collapsed')) {
+        container.classList.remove('collapsed');
+        toggle.textContent = '-';
+    } else {
+        container.classList.add('collapsed');
+        toggle.textContent = '+';
+    }
+}
+
+// Toggle tools section with accordion behavior
+function toggleToolsSection(section) {
+    const sections = ['import', 'export', 'gaps'];
+
+    sections.forEach(s => {
+        const container = document.getElementById(`${s}Container`);
+        const toggle = document.getElementById(`${s}Toggle`);
+
+        if (s === section) {
+            // Toggle the clicked section
+            if (container.classList.contains('collapsed')) {
+                container.classList.remove('collapsed');
+                toggle.textContent = '-';
+
+                // Run gap analysis if opening gaps section
+                if (section === 'gaps') {
+                    runGapAnalysis();
+                }
+            } else {
+                container.classList.add('collapsed');
+                toggle.textContent = '+';
+            }
+        } else {
+            // Collapse other sections
+            container.classList.add('collapsed');
+            toggle.textContent = '+';
+        }
+    });
+}
+
+// Toggle CSV format help
+function toggleCsvFormat() {
+    const container = document.getElementById('csvFormatHelp');
+    const toggle = document.getElementById('csvFormatToggle');
+
+    if (container.classList.contains('collapsed')) {
+        container.classList.remove('collapsed');
+        toggle.textContent = '-';
+    } else {
+        container.classList.add('collapsed');
+        toggle.textContent = '+';
+    }
+}
+
+// Export index from dropdown
+function exportIndexFromDropdown() {
+    const format = document.getElementById('indexExportFormat').value;
+    exportIndex(format);
+}
+
+// Export notes from dropdown
+function exportNotesFromDropdown() {
+    const format = document.getElementById('notesExportFormat').value;
+    exportNotes(format);
+}
+
+// Load recent entries
+async function loadRecentEntries(reset = true) {
+    if (reset) {
+        recentEntriesOffset = 0;
+        allRecentEntries = [];
+    }
+
+    try {
+        // Load more entries than we need to know if there are more
+        const response = await fetch(`/api/entries/recent?limit=100`);
+        const data = await response.json();
+        allRecentEntries = data.entries;
+        displayRecentEntries();
+    } catch (error) {
+        console.error('Error loading recent entries:', error);
+        const container = document.getElementById('recentEntriesList');
+        if (container) {
+            container.innerHTML = '<p class="empty-state">Failed to load recent entries</p>';
+        }
+    }
+}
+
+// Display recent entries
+function displayRecentEntries() {
+    const container = document.getElementById('recentEntriesList');
+    const showMoreBtn = document.getElementById('recentEntriesShowMore');
+
+    if (!container) return;
+
+    if (allRecentEntries.length === 0) {
+        container.innerHTML = '<p class="empty-state">No entries yet</p>';
+        if (showMoreBtn) showMoreBtn.style.display = 'none';
+        return;
+    }
+
+    // Get entries to display (offset to offset + limit)
+    const entriesToShow = allRecentEntries.slice(0, recentEntriesOffset + recentEntriesLimit);
+
+    let html = '';
+    entriesToShow.forEach(entry => {
+        html += `<div class="recent-entry-item">`;
+        html += `<div class="recent-entry-term">${escapeHtml(entry.term)}</div>`;
+        html += `<div class="recent-entry-ref" onclick="editEntry('${escapeHtml(entry.term)}', '${escapeHtml(entry.reference)}')">${escapeHtml(entry.reference)}</div>`;
+        html += `</div>`;
+    });
+
+    container.innerHTML = html;
+
+    // Show or hide the "Show More" button
+    if (showMoreBtn) {
+        if (entriesToShow.length < allRecentEntries.length) {
+            showMoreBtn.style.display = 'block';
+        } else {
+            showMoreBtn.style.display = 'none';
+        }
+    }
+}
+
+// Show more recent entries
+function showMoreRecentEntries() {
+    recentEntriesOffset += recentEntriesLimit;
+    displayRecentEntries();
+}
+
+// Load all entries
+async function loadEntries() {
+    try {
+        const response = await fetch('/api/entries');
+        const data = await response.json();
+        allEntries = data.entries;
+
+        // If no letter is selected and we have entries, select the first letter alphabetically
+        if (!selectedLetter && allEntries.length > 0) {
+            // Get all unique letters
+            const letters = new Set();
+            allEntries.forEach(entry => {
+                letters.add(normalizeFirstLetter(entry.term));
+            });
+
+            // Sort letters with # first
+            const sortedLetters = Array.from(letters).sort((a, b) => {
+                if (a === '#') return -1;
+                if (b === '#') return 1;
+                return a.localeCompare(b);
+            });
+
+            selectedLetter = sortedLetters[0];
+        }
+
+        buildLetterNavigation();
+        displayEntries(allEntries);
+    } catch (error) {
+        showMessage('Error loading entries: ' + error.message, 'error');
+    }
+}
+
+// Refresh entries
+function refreshEntries() {
+    document.getElementById('searchInput').value = '';
+    currentSearchQuery = '';
+    selectedLetter = null;
+    loadEntries();
+}
+
+// Build letter navigation
+function buildLetterNavigation() {
+    const navContainer = document.getElementById('letterNav');
+
+    if (!navContainer) return;
+
+    // Apply book filter if selected
+    let entriesToNavigate = allEntries;
+    if (selectedBookFilter) {
+        entriesToNavigate = allEntries.filter(entry => {
+            return entry.references.some(ref => ref.startsWith(selectedBookFilter + ':'));
+        });
+    }
+
+    // Get all unique first letters from entries
+    const letters = new Set();
+    entriesToNavigate.forEach(entry => {
+        letters.add(normalizeFirstLetter(entry.term));
+    });
+
+    // Sort letters, but put "#" at the beginning
+    const sortedLetters = Array.from(letters).sort((a, b) => {
+        if (a === '#') return -1;  // # goes to the beginning
+        if (b === '#') return 1;   // # goes to the beginning
+        return a.localeCompare(b);
+    });
+
+    // Build navigation HTML
+    let html = '';
+    sortedLetters.forEach(letter => {
+        const activeClass = letter === selectedLetter ? 'active' : '';
+        html += `<button class="letter-nav-btn ${activeClass}" onclick="filterByLetter('${letter}')">${letter}</button>`;
+    });
+
+    navContainer.innerHTML = html;
+}
+
+// Filter entries by letter
+function filterByLetter(letter) {
+    // Toggle: if clicking the already-selected letter, deselect it to show all
+    if (selectedLetter === letter) {
+        selectedLetter = null;
+    } else {
+        selectedLetter = letter;
+    }
+
+    currentSearchQuery = '';
+    document.getElementById('searchInput').value = '';
+    buildLetterNavigation();
+    displayEntries(allEntries);
+}
+
+// Check for duplicate entry
+function checkDuplicate(term, reference) {
+    const entry = allEntries.find(e => e.term.toLowerCase() === term.toLowerCase());
+    if (entry && entry.references.includes(reference)) {
+        return true;
+    }
+    return false;
+}
+
+// Handle adding new entry
+async function handleAddEntry(e) {
+    e.preventDefault();
+
+    const term = document.getElementById('term').value.trim();
+    const book = document.getElementById('book').value.trim();
+    const page = document.getElementById('page').value.trim();
+    const pageEnd = document.getElementById('pageEnd').value.trim();
+    const notes = document.getElementById('notes').value.trim();
+
+    // Check if at least one of reference or notes is provided
+    const hasReference = book && page;
+    const hasNotes = notes.length > 0;
+
+    if (!hasReference && !hasNotes) {
+        showMessage('Please provide either a reference (book and page) or notes', 'error');
+        return;
+    }
+
+    let reference = '';
+    if (hasReference) {
+        // Build reference string
+        reference = `${book}:${page}`;
+        if (pageEnd) {
+            reference += `-${pageEnd}`;
+        }
+
+        // Check for duplicate only if adding a reference
+        if (checkDuplicate(term, reference)) {
+            if (!confirm(`This entry already exists: "${term}" → ${reference}\n\nAdd anyway?`)) {
+                return;
+            }
+        }
+    }
+
+    try {
+        let response, data;
+
+        if (hasReference) {
+            // Add reference (which can include notes)
+            response = await fetch('/api/add', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ term, reference, notes })
+            });
+            data = await response.json();
+        } else {
+            // Add only notes (no reference)
+            response = await fetch('/api/notes/update', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ term, notes })
+            });
+            data = await response.json();
+        }
+
+        if (response.ok) {
+            showMessage(data.message, 'success');
+
+            // Remember the last used book if reference was added
+            if (hasReference) {
+                lastUsedBook = book;
+            }
+
+            // Reset form
+            document.getElementById('addForm').reset();
+
+            // Restore the last used book in the dropdown
+            if (lastUsedBook) {
+                document.getElementById('book').value = lastUsedBook;
+            }
+
+            document.getElementById('term').focus();
+            loadEntries();
+            loadRecentEntries(); // Refresh recent entries list
+        } else if (response.status === 409) {
+            showMessage(data.message, 'warning');
+        } else {
+            showMessage(data.error || 'Failed to add entry', 'error');
+        }
+    } catch (error) {
+        showMessage('Error: ' + error.message, 'error');
+    }
+}
+
+// Handle CSV import
+async function handleImportCSV(e) {
+    e.preventDefault();
+
+    const csvData = document.getElementById('csvData').value.trim();
+
+    if (!csvData) {
+        showImportMessage('Please paste CSV data to import', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/import', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ csv_data: csvData })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showImportMessage(data.message, 'success');
+            displayImportResults(data);
+            document.getElementById('csvData').value = '';
+            loadEntries();
+        } else {
+            showImportMessage(data.error || 'Failed to import entries', 'error');
+        }
+    } catch (error) {
+        showImportMessage('Error: ' + error.message, 'error');
+    }
+}
+
+// Display import results
+function displayImportResults(data) {
+    const resultsDiv = document.getElementById('importResults');
+
+    let html = '<h3>Import Results:</h3><ul>';
+    html += `<li>Successfully imported: ${data.imported || 0} entries</li>`;
+
+    if (data.skipped && data.skipped > 0) {
+        html += `<li>Skipped (duplicates): ${data.skipped} entries</li>`;
+    }
+
+    if (data.errors && data.errors.length > 0) {
+        html += `<li>Errors: ${data.errors.length}</li>`;
+        html += '<ul>';
+        data.errors.forEach(error => {
+            html += `<li style="color: var(--error-color);">${escapeHtml(error)}</li>`;
+        });
+        html += '</ul>';
+    }
+
+    html += '</ul>';
+    resultsDiv.innerHTML = html;
+    resultsDiv.classList.add('show');
+
+    // Hide after 10 seconds
+    setTimeout(() => {
+        resultsDiv.classList.remove('show');
+    }, 10000);
+}
+
+// Show import message
+function showImportMessage(text, type = 'success') {
+    const messageDiv = document.getElementById('importMessage');
+    messageDiv.textContent = text;
+    messageDiv.className = `message ${type} show`;
+
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+        messageDiv.classList.remove('show');
+    }, 5000);
+}
+
+// Load all notes
+async function loadNotes() {
+    try {
+        const response = await fetch('/api/notes');
+        const data = await response.json();
+        allNotes = data.notes;
+        displayNotes(allNotes);
+    } catch (error) {
+        showMessage('Error loading notes: ' + error.message, 'error');
+    }
+}
+
+// Refresh notes
+function refreshNotes() {
+    loadNotes();
+    document.getElementById('notesSearchInput').value = '';
+}
+
+// Display notes
+function displayNotes(notes) {
+    const container = document.getElementById('notesList');
+
+    if (notes.length === 0) {
+        container.innerHTML = '<p class="empty-state">No notes found</p>';
+        updateNotesStats(0);
+        return;
+    }
+
+    let html = '';
+    notes.forEach(note => {
+        html += `<div class="note-item" onclick="editNotes('${escapeHtml(note.term)}', '${escapeHtml(note.notes)}')">`;
+        html += `<div class="note-term">${escapeHtml(note.term)}</div>`;
+        html += `<div class="note-text">${escapeHtml(note.notes)}</div>`;
+        html += `</div>`;
+    });
+
+    container.innerHTML = html;
+    updateNotesStats(notes.length);
+}
+
+// Update notes statistics
+function updateNotesStats(count) {
+    const stats = document.getElementById('notesStats');
+    stats.textContent = `Total notes: ${count}`;
+}
+
+// Handle notes search
+function handleNotesSearch(e) {
+    const query = e.target.value.trim();
+
+    // Clear previous timeout
+    if (notesSearchTimeout) {
+        clearTimeout(notesSearchTimeout);
+    }
+
+    // Debounce search
+    notesSearchTimeout = setTimeout(() => {
+        if (query === '') {
+            displayNotes(allNotes);
+        } else {
+            const filtered = allNotes.filter(note =>
+                note.term.toLowerCase().includes(query.toLowerCase()) ||
+                note.notes.toLowerCase().includes(query.toLowerCase())
+            );
+            displayNotes(filtered);
+        }
+    }, 300);
+}
+
+// Open edit notes modal
+function editNotes(term, notes) {
+    document.getElementById('editNotesTerm').value = term;
+    document.getElementById('editNotesText').value = notes;
+    document.getElementById('editNotesText').focus();
+    document.getElementById('editNotesModal').classList.add('show');
+}
+
+// Close edit notes modal
+function closeEditNotesModal() {
+    document.getElementById('editNotesModal').classList.remove('show');
+    document.getElementById('editNotesForm').reset();
+}
+
+// Handle edit notes form submission
+async function handleEditNotes(e) {
+    e.preventDefault();
+
+    const term = document.getElementById('editNotesTerm').value.trim();
+    const notes = document.getElementById('editNotesText').value.trim();
+
+    try {
+        const response = await fetch('/api/notes/update', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ term, notes })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showMessage(data.message, 'success');
+            closeEditNotesModal();
+            loadNotes();
+        } else {
+            showMessage(data.error || 'Failed to update notes', 'error');
+        }
+    } catch (error) {
+        showMessage('Error: ' + error.message, 'error');
+    }
+}
+
+// Delete notes from modal
+async function deleteNotesFromModal() {
+    const term = document.getElementById('editNotesTerm').value.trim();
+
+    if (!confirm(`Delete notes for "${term}"?`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/notes/delete', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ term })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showMessage(data.message, 'success');
+            closeEditNotesModal();
+            loadNotes();
+        } else {
+            showMessage(data.error || 'Failed to delete notes', 'error');
+        }
+    } catch (error) {
+        showMessage('Error: ' + error.message, 'error');
+    }
+}
+
+// Export notes
+function exportNotes(format) {
+    window.location.href = `/api/notes/export/${format}`;
+}
+
+// Handle search
+function handleSearch(e) {
+    const query = e.target.value.trim();
+
+    // Clear previous timeout
+    if (searchTimeout) {
+        clearTimeout(searchTimeout);
+    }
+
+    // Debounce search
+    searchTimeout = setTimeout(() => {
+        currentSearchQuery = query;
+
+        if (query === '') {
+            // Reset to show selected letter
+            buildLetterNavigation();
+            displayEntries(allEntries);
+        } else {
+            // When searching, clear letter selection
+            selectedLetter = null;
+            buildLetterNavigation();
+
+            const filtered = allEntries.filter(entry =>
+                entry.term.toLowerCase().includes(query.toLowerCase())
+            );
+            displayEntries(filtered);
+        }
+    }, 300);
+}
+
+// Display entries grouped by letter
+function displayEntries(entries) {
+    const container = document.getElementById('entriesList');
+
+    // Apply book filter if selected
+    let filteredEntries = entries;
+    if (selectedBookFilter) {
+        filteredEntries = entries.filter(entry => {
+            return entry.references.some(ref => ref.startsWith(selectedBookFilter + ':'));
+        });
+    }
+
+    if (filteredEntries.length === 0) {
+        let html = '<p class="empty-state">No entries found</p>';
+
+        // If user was searching, show "Add Entry" button
+        if (currentSearchQuery) {
+            html = `<div class="empty-state">
+                        <p>No entries found for "${escapeHtml(currentSearchQuery)}"</p>
+                        <div class="empty-state-actions">
+                            <button class="btn btn-primary" onclick="addEntryFromSearch('${escapeHtml(currentSearchQuery)}')">
+                                + Add Entry for "${escapeHtml(currentSearchQuery)}"
+                            </button>
+                        </div>
+                    </div>`;
+        } else if (selectedBookFilter) {
+            html = `<p class="empty-state">No entries found for the selected book</p>`;
+        }
+
+        container.innerHTML = html;
+        updateStats(0);
+        return;
+    }
+
+    // Group by first letter
+    const grouped = {};
+    filteredEntries.forEach(entry => {
+        const letter = normalizeFirstLetter(entry.term);
+        if (!grouped[letter]) {
+            grouped[letter] = [];
+        }
+        grouped[letter].push(entry);
+    });
+
+    // Sort letters, but put "#" at the beginning
+    const letters = Object.keys(grouped).sort((a, b) => {
+        if (a === '#') return -1;  // # goes to the beginning
+        if (b === '#') return 1;   // # goes to the beginning
+        return a.localeCompare(b);
+    });
+
+    // If not searching and a letter is selected, show only that letter
+    let lettersToShow = letters;
+    if (!currentSearchQuery && selectedLetter) {
+        lettersToShow = letters.filter(l => l === selectedLetter);
+    }
+
+    // Build HTML
+    let html = '';
+    let totalShown = 0;
+
+    lettersToShow.forEach(letter => {
+        html += `<div class="letter-group">`;
+        html += `<div class="letter-heading">${letter}</div>`;
+
+        grouped[letter].forEach(entry => {
+            totalShown++;
+            html += `<div class="entry-item">`;
+            html += `<div><div class="entry-term">${escapeHtml(entry.term)}</div>`;
+
+            // Display references on one line, separated by commas
+            html += `<div class="entry-refs">`;
+            entry.references.forEach((ref, index) => {
+                if (index > 0) html += ',';
+                html += `<span class="ref-link" onclick="editEntry('${escapeHtml(entry.term)}', '${escapeHtml(ref)}')">${escapeHtml(ref)}</span>`;
+            });
+            html += `</div>`;
+
+            html += `</div></div>`;
+        });
+
+        html += `</div>`;
+    });
+
+    container.innerHTML = html;
+    updateStats(totalShown);
+}
+
+// Update statistics
+function updateStats(count) {
+    const stats = document.getElementById('stats');
+    stats.textContent = `Total entries: ${count}`;
+}
+
+// Delete entry
+async function deleteEntry(term) {
+    if (!confirm(`Delete all references for "${term}"?`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/delete', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ term })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showViewEntriesMessage(data.message, 'success');
+            loadEntries();
+        } else {
+            showViewEntriesMessage(data.error || 'Failed to delete entry', 'error');
+        }
+    } catch (error) {
+        showViewEntriesMessage('Error: ' + error.message, 'error');
+    }
+}
+
+// Delete specific reference
+async function deleteReference(term, reference) {
+    if (!confirm(`Delete reference "${reference}" for term "${term}"?`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/delete', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ term, reference })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showViewEntriesMessage(data.message, 'success');
+            loadEntries();
+        } else {
+            showViewEntriesMessage(data.error || 'Failed to delete reference', 'error');
+        }
+    } catch (error) {
+        showViewEntriesMessage('Error: ' + error.message, 'error');
+    }
+}
+
+// Open edit modal
+async function editEntry(term, reference) {
+    document.getElementById('editTerm').value = term;
+    document.getElementById('editTerm').setAttribute('data-original-term', term);
+    document.getElementById('editOldReference').value = reference;
+
+    // Parse the reference to populate individual fields
+    const parts = reference.split(':');
+    if (parts.length === 2) {
+        const book = parts[0];
+        const pageparts = parts[1].split('-');
+
+        // Set book dropdown value
+        const editBookSelect = document.getElementById('editBook');
+        // Check if this book exists in the dropdown
+        let bookExists = false;
+        for (let i = 0; i < editBookSelect.options.length; i++) {
+            if (editBookSelect.options[i].value === book) {
+                editBookSelect.value = book;
+                bookExists = true;
+                break;
+            }
+        }
+
+        // If book doesn't exist in dropdown, add it as custom option
+        if (!bookExists && book) {
+            const customOption = document.createElement('option');
+            customOption.value = book;
+            customOption.textContent = book;
+            customOption.selected = true;
+            // Insert before "Other" option
+            editBookSelect.insertBefore(customOption, editBookSelect.lastElementChild);
+        }
+
+        document.getElementById('editPage').value = pageparts[0];
+        document.getElementById('editPageEnd').value = pageparts[1] || '';
+    }
+
+    // Load notes for this term
+    try {
+        const response = await fetch('/api/notes');
+        const data = await response.json();
+        const noteEntry = data.notes.find(n => n.term.toLowerCase() === term.toLowerCase());
+        document.getElementById('editNotes').value = noteEntry ? noteEntry.notes : '';
+    } catch (error) {
+        console.error('Error loading notes:', error);
+        document.getElementById('editNotes').value = '';
+    }
+
+    document.getElementById('editBook').focus();
+    document.getElementById('editModal').classList.add('show');
+}
+
+// Close edit modal
+function closeEditModal() {
+    document.getElementById('editModal').classList.remove('show');
+    document.getElementById('editForm').reset();
+}
+
+// Handle edit form submission
+async function handleEditEntry(e) {
+    e.preventDefault();
+
+    const term = document.getElementById('editTerm').value.trim();
+    const oldTerm = document.getElementById('editTerm').getAttribute('data-original-term');
+    const oldReference = document.getElementById('editOldReference').value.trim();
+    const notes = document.getElementById('editNotes').value.trim();
+
+    const book = document.getElementById('editBook').value.trim();
+    const page = document.getElementById('editPage').value.trim();
+    const pageEnd = document.getElementById('editPageEnd').value.trim();
+
+    // Build new reference string
+    let newReference = `${book}:${page}`;
+    if (pageEnd) {
+        newReference += `-${pageEnd}`;
+    }
+
+    try {
+        const response = await fetch('/api/update', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ term, old_term: oldTerm, old_reference: oldReference, new_reference: newReference })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            // Always update notes (even if empty, to allow clearing them)
+            await fetch('/api/notes/update', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ term, notes })
+            });
+
+            // Check if we're on the View Entries tab or Add Entry tab
+            const activeTab = document.querySelector('.tab-content.active');
+            if (activeTab && activeTab.id === 'tab-view') {
+                showViewEntriesMessage(data.message, 'success');
+            } else {
+                showMessage(data.message, 'success');
+            }
+            closeEditModal();
+            loadEntries();
+            loadRecentEntries(); // Refresh recent entries
+        } else {
+            const activeTab = document.querySelector('.tab-content.active');
+            if (activeTab && activeTab.id === 'tab-view') {
+                showViewEntriesMessage(data.error || 'Failed to update reference', 'error');
+            } else {
+                showMessage(data.error || 'Failed to update reference', 'error');
+            }
+        }
+    } catch (error) {
+        const activeTab = document.querySelector('.tab-content.active');
+        if (activeTab && activeTab.id === 'tab-view') {
+            showViewEntriesMessage('Error: ' + error.message, 'error');
+        } else {
+            showMessage('Error: ' + error.message, 'error');
+        }
+    }
+}
+
+// Delete reference from modal
+async function deleteReferenceFromModal() {
+    const term = document.getElementById('editTerm').value.trim();
+    const reference = document.getElementById('editOldReference').value.trim();
+
+    if (!confirm(`Delete reference "${reference}" for term "${term}"?`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/delete', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ term, reference })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            // Check if we're on the View Entries tab or Add Entry tab
+            const activeTab = document.querySelector('.tab-content.active');
+            if (activeTab && activeTab.id === 'tab-view') {
+                showViewEntriesMessage(data.message, 'success');
+            } else {
+                showMessage(data.message, 'success');
+            }
+            closeEditModal();
+            loadEntries();
+            loadRecentEntries(); // Refresh recent entries
+        } else {
+            const activeTab = document.querySelector('.tab-content.active');
+            if (activeTab && activeTab.id === 'tab-view') {
+                showViewEntriesMessage(data.error || 'Failed to delete reference', 'error');
+            } else {
+                showMessage(data.error || 'Failed to delete reference', 'error');
+            }
+        }
+    } catch (error) {
+        const activeTab = document.querySelector('.tab-content.active');
+        if (activeTab && activeTab.id === 'tab-view') {
+            showViewEntriesMessage('Error: ' + error.message, 'error');
+        } else {
+            showMessage('Error: ' + error.message, 'error');
+        }
+    }
+}
+
+// Add entry from search
+function addEntryFromSearch(term) {
+    // Switch to Add Entry tab
+    switchTab('add');
+
+    // Pre-populate the term field
+    document.getElementById('term').value = term;
+    document.getElementById('book').focus();
+
+    // Clear the search
+    document.getElementById('searchInput').value = '';
+    currentSearchQuery = '';
+}
+
+// Export index
+function exportIndex(format) {
+    window.location.href = `/api/export/${format}`;
+}
+
+// Show message
+function showMessage(text, type = 'success') {
+    const messageDiv = document.getElementById('message');
+    messageDiv.textContent = text;
+    messageDiv.className = `message ${type} show`;
+
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+        messageDiv.classList.remove('show');
+    }, 5000);
+}
+
+// Show message on View Entries tab
+function showViewEntriesMessage(text, type = 'success') {
+    const messageDiv = document.getElementById('viewEntriesMessage');
+    messageDiv.textContent = text;
+    messageDiv.className = `message ${type} show`;
+
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+        messageDiv.classList.remove('show');
+    }, 5000);
+}
+
+// Escape HTML to prevent XSS
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Load settings
+async function loadSettings() {
+    try {
+        const response = await fetch('/api/settings');
+        const data = await response.json();
+
+        // Update index name in header
+        if (data.index_name) {
+            document.getElementById('indexName').textContent = data.index_name;
+        }
+    } catch (error) {
+        console.error('Error loading settings:', error);
+    }
+}
+
+// Load settings tab
+async function loadSettingsTab() {
+    try {
+        const response = await fetch('/api/settings');
+        const data = await response.json();
+        document.getElementById('settingsIndexName').value = data.index_name || '';
+        document.getElementById('settingsIndexYear').value = data.index_year || '';
+        document.getElementById('settingsIndexVersion').value = data.index_version || '';
+    } catch (error) {
+        console.error('Error loading settings:', error);
+    }
+}
+
+// Save index settings
+async function saveIndexSettings() {
+    const name = document.getElementById('settingsIndexName').value.trim();
+    const year = document.getElementById('settingsIndexYear').value.trim();
+    const version = document.getElementById('settingsIndexVersion').value.trim();
+
+    if (!name) {
+        showSettingsMessage('indexSettingsMessage', 'Please enter a name', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/settings/index-name', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ name, year, version })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showSettingsMessage('indexSettingsMessage', data.message, 'success');
+            loadSettings();
+        } else {
+            showSettingsMessage('indexSettingsMessage', data.error || 'Failed to save settings', 'error');
+        }
+    } catch (error) {
+        showSettingsMessage('indexSettingsMessage', 'Error: ' + error.message, 'error');
+    }
+}
+
+// Backup database
+function backupDatabase() {
+    window.location.href = '/api/settings/backup';
+    // Don't show message as the file download will indicate success
+}
+
+// Create new index (clear all data)
+async function createNewIndex() {
+    const confirmed = confirm(
+        'WARNING: This will permanently delete ALL entries and notes!\n\n' +
+        'Are you sure you want to create a new index?\n\n' +
+        'Consider backing up your database first.'
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/settings/clear', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showMessage(data.message, 'success');
+            // Reload entries and notes
+            loadEntries();
+            loadNotes();
+        } else {
+            showMessage(data.error || 'Failed to clear data', 'error');
+        }
+    } catch (error) {
+        showMessage('Error: ' + error.message, 'error');
+    }
+}
+
+// Show settings message
+function showSettingsMessage(messageId, text, type = 'success') {
+    const messageDiv = document.getElementById(messageId);
+    if (!messageDiv) {
+        console.error('Message div not found:', messageId);
+        return;
+    }
+    messageDiv.textContent = text;
+    messageDiv.className = `message ${type} show`;
+
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+        messageDiv.classList.remove('show');
+    }, 5000);
+}
+
+// Load book dropdowns
+async function loadBookDropdowns() {
+    try {
+        const response = await fetch('/api/books');
+        const data = await response.json();
+
+        // Populate all dropdowns
+        const bookSelect = document.getElementById('book');
+        const editBookSelect = document.getElementById('editBook');
+        const bookFilter = document.getElementById('bookFilter');
+
+        // Clear existing options except the first placeholder
+        bookSelect.innerHTML = '<option value="">Book</option>';
+        editBookSelect.innerHTML = '<option value="">Book</option>';
+        bookFilter.innerHTML = '<option value="">All Books</option>';
+
+        // Add books as options
+        data.books.forEach(book => {
+            const option1 = document.createElement('option');
+            option1.value = book.book_number;
+            option1.textContent = `${book.book_number}: ${book.book_name}`;
+            bookSelect.appendChild(option1);
+
+            const option2 = document.createElement('option');
+            option2.value = book.book_number;
+            option2.textContent = `${book.book_number}: ${book.book_name}`;
+            editBookSelect.appendChild(option2);
+
+            const option3 = document.createElement('option');
+            option3.value = book.book_number;
+            option3.textContent = `Book ${book.book_number}: ${book.book_name}`;
+            bookFilter.appendChild(option3);
+        });
+
+        // Add "Other" option for manual entry (not for filter)
+        const otherOption1 = document.createElement('option');
+        otherOption1.value = 'other';
+        otherOption1.textContent = 'Other (manual entry)';
+        bookSelect.appendChild(otherOption1);
+
+        const otherOption2 = document.createElement('option');
+        otherOption2.value = 'other';
+        otherOption2.textContent = 'Other (manual entry)';
+        editBookSelect.appendChild(otherOption2);
+
+    } catch (error) {
+        console.error('Error loading book dropdowns:', error);
+    }
+}
+
+// Load books list
+async function loadBooks() {
+    try {
+        const response = await fetch('/api/books');
+        const data = await response.json();
+        displayBooks(data.books);
+    } catch (error) {
+        console.error('Error loading books:', error);
+    }
+}
+
+// Display books list
+function displayBooks(books) {
+    const container = document.getElementById('booksList');
+
+    if (books.length === 0) {
+        container.innerHTML = '<p class="empty-state">No books added yet</p>';
+        return;
+    }
+
+    let html = '';
+    books.forEach(book => {
+        html += `<div class="book-item">`;
+        html += `<div class="book-info">`;
+        html += `<span class="book-number">Book ${escapeHtml(book.book_number)}:</span>`;
+        html += `<span class="book-name">${escapeHtml(book.book_name)}</span>`;
+        html += `<span class="book-pages">(${book.page_count} pages)</span>`;
+        html += `</div>`;
+        html += `<div class="book-actions">`;
+        html += `<button class="btn btn-secondary book-edit-btn" data-number="${escapeHtml(book.book_number)}" data-name="${escapeHtml(book.book_name)}" data-pages="${book.page_count}">Edit</button>`;
+        html += `</div></div>`;
+    });
+
+    container.innerHTML = html;
+
+    // Add event listeners to edit buttons
+    const editButtons = container.querySelectorAll('.book-edit-btn');
+    editButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const bookNumber = this.getAttribute('data-number');
+            const bookName = this.getAttribute('data-name');
+            const pageCount = this.getAttribute('data-pages');
+            editBook(bookNumber, bookName, pageCount);
+        });
+    });
+}
+
+// Add a new book
+async function addBook() {
+    const bookNumber = document.getElementById('newBookNumber').value.trim();
+    const bookName = document.getElementById('newBookName').value.trim();
+    const pageCount = document.getElementById('newBookPages').value.trim();
+
+    if (!bookNumber || !bookName) {
+        showSettingsMessage('addBookMessage', 'Book number and name are required', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/books/add', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                book_number: bookNumber,
+                book_name: bookName,
+                page_count: pageCount
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showSettingsMessage('addBookMessage', data.message, 'success');
+            document.getElementById('newBookNumber').value = '';
+            document.getElementById('newBookName').value = '';
+            document.getElementById('newBookPages').value = '';
+            loadBooks();
+            loadBookDropdowns(); // Refresh dropdowns
+        } else {
+            showSettingsMessage('addBookMessage', data.error || 'Failed to add book', 'error');
+        }
+    } catch (error) {
+        showSettingsMessage('addBookMessage', 'Error: ' + error.message, 'error');
+    }
+}
+
+// Open edit book modal
+function editBook(bookNumber, bookName, pageCount) {
+    document.getElementById('editBookOldNumber').value = bookNumber;
+    document.getElementById('editBookNumber').value = bookNumber;
+    document.getElementById('editBookName').value = bookName;
+    document.getElementById('editBookPages').value = pageCount || '';
+    document.getElementById('editBookNumber').focus();
+    document.getElementById('editBookModal').classList.add('show');
+}
+
+// Close edit book modal
+function closeEditBookModal() {
+    document.getElementById('editBookModal').classList.remove('show');
+    document.getElementById('editBookForm').reset();
+}
+
+// Handle edit book form submission
+async function handleEditBook(e) {
+    e.preventDefault();
+
+    const oldNumber = document.getElementById('editBookOldNumber').value.trim();
+    const bookNumber = document.getElementById('editBookNumber').value.trim();
+    const bookName = document.getElementById('editBookName').value.trim();
+    const pageCount = document.getElementById('editBookPages').value.trim();
+
+    if (!bookNumber || !bookName) {
+        showSettingsMessage('bookManagementMessage', 'Book number and name are required', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/books/update', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                old_number: oldNumber,
+                book_number: bookNumber,
+                book_name: bookName,
+                page_count: pageCount
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showSettingsMessage('bookManagementMessage', data.message, 'success');
+            closeEditBookModal();
+            loadBooks();
+            loadBookDropdowns(); // Refresh dropdowns
+        } else {
+            showSettingsMessage('bookManagementMessage', data.error || 'Failed to update book', 'error');
+        }
+    } catch (error) {
+        showSettingsMessage('bookManagementMessage', 'Error: ' + error.message, 'error');
+    }
+}
+
+// Delete book from modal
+async function deleteBookFromModal() {
+    const bookNumber = document.getElementById('editBookNumber').value.trim();
+
+    try {
+        // First, get the count of references and exclusions
+        const countResponse = await fetch(`/api/books/reference-count/${bookNumber}`);
+        const countData = await countResponse.json();
+
+        if (!countResponse.ok) {
+            showSettingsMessage('bookManagementMessage', countData.error || 'Failed to get reference count', 'error');
+            return;
+        }
+
+        const refCount = countData.reference_count;
+        const exclusionCount = countData.exclusion_count;
+
+        // Build confirmation message
+        let message = `Delete book ${bookNumber}?\n\nThis will permanently delete:\n`;
+        message += `- The book registration\n`;
+        if (refCount > 0) {
+            message += `- ${refCount} page reference${refCount !== 1 ? 's' : ''}\n`;
+        }
+        if (exclusionCount > 0) {
+            message += `- ${exclusionCount} gap exclusion${exclusionCount !== 1 ? 's' : ''}\n`;
+        }
+        message += `\nThis action cannot be undone.`;
+
+        if (!confirm(message)) {
+            return;
+        }
+
+        // Proceed with deletion
+        const response = await fetch('/api/books/delete', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ book_number: bookNumber })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showSettingsMessage('bookManagementMessage', data.message, 'success');
+            closeEditBookModal();
+            loadBooks();
+            loadBookDropdowns(); // Refresh dropdowns
+        } else {
+            showSettingsMessage('bookManagementMessage', data.error || 'Failed to delete book', 'error');
+        }
+    } catch (error) {
+        showSettingsMessage('bookManagementMessage', 'Error: ' + error.message, 'error');
+    }
+}
+
+// Setup autocomplete for term input
+function setupAutocomplete() {
+    const input = document.getElementById('term');
+    const autocompleteList = document.getElementById('autocomplete-list');
+
+    if (!input || !autocompleteList) return;
+
+    // Handle input changes
+    input.addEventListener('input', function(e) {
+        const value = this.value.trim();
+        autocompleteIndex = -1;
+
+        if (!value) {
+            autocompleteList.classList.remove('show');
+            autocompleteList.innerHTML = '';
+            return;
+        }
+
+        // Filter existing terms
+        const matches = allEntries
+            .map(entry => entry.term)
+            .filter(term => term.toLowerCase().includes(value.toLowerCase()))
+            .sort((a, b) => {
+                // Prioritize matches at the start
+                const aStarts = a.toLowerCase().startsWith(value.toLowerCase());
+                const bStarts = b.toLowerCase().startsWith(value.toLowerCase());
+                if (aStarts && !bStarts) return -1;
+                if (!aStarts && bStarts) return 1;
+                return a.localeCompare(b);
+            })
+            .slice(0, 10); // Limit to 10 suggestions
+
+        if (matches.length === 0) {
+            autocompleteList.classList.remove('show');
+            autocompleteList.innerHTML = '';
+            return;
+        }
+
+        // Build autocomplete items
+        let html = '';
+        matches.forEach((term, index) => {
+            // Highlight matching part
+            const termLower = term.toLowerCase();
+            const valueLower = value.toLowerCase();
+            const matchIndex = termLower.indexOf(valueLower);
+
+            let displayTerm = term;
+            if (matchIndex >= 0) {
+                displayTerm = term.substring(0, matchIndex) +
+                    '<strong>' + term.substring(matchIndex, matchIndex + value.length) + '</strong>' +
+                    term.substring(matchIndex + value.length);
+            }
+
+            html += `<div class="autocomplete-item" data-value="${escapeHtml(term)}">${displayTerm}</div>`;
+        });
+
+        autocompleteList.innerHTML = html;
+        autocompleteList.classList.add('show');
+
+        // Add click handlers to items
+        const items = autocompleteList.querySelectorAll('.autocomplete-item');
+        items.forEach(item => {
+            item.addEventListener('click', async function() {
+                const selectedTerm = this.getAttribute('data-value');
+                input.value = selectedTerm;
+                autocompleteList.classList.remove('show');
+                autocompleteList.innerHTML = '';
+
+                // Auto-populate notes for existing term
+                await populateNotesForTerm(selectedTerm);
+
+                document.getElementById('book').focus();
+            });
+        });
+    });
+
+    // Handle keyboard navigation
+    input.addEventListener('keydown', function(e) {
+        const items = autocompleteList.querySelectorAll('.autocomplete-item');
+
+        if (items.length === 0) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            autocompleteIndex = Math.min(autocompleteIndex + 1, items.length - 1);
+            updateAutocompleteActive(items);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            autocompleteIndex = Math.max(autocompleteIndex - 1, -1);
+            updateAutocompleteActive(items);
+        } else if (e.key === 'Enter' || e.key === 'Tab') {
+            if (autocompleteIndex >= 0) {
+                e.preventDefault();
+                const selectedTerm = items[autocompleteIndex].getAttribute('data-value');
+                input.value = selectedTerm;
+                autocompleteList.classList.remove('show');
+                autocompleteList.innerHTML = '';
+                autocompleteIndex = -1;
+
+                // Auto-populate notes for existing term
+                populateNotesForTerm(selectedTerm).then(() => {
+                    if (e.key === 'Tab' || e.key === 'Enter') {
+                        document.getElementById('book').focus();
+                    }
+                });
+            }
+        } else if (e.key === 'Escape') {
+            autocompleteList.classList.remove('show');
+            autocompleteList.innerHTML = '';
+            autocompleteIndex = -1;
+        }
+    });
+
+    // Close autocomplete when clicking outside
+    document.addEventListener('click', function(e) {
+        if (e.target !== input) {
+            autocompleteList.classList.remove('show');
+            autocompleteList.innerHTML = '';
+            autocompleteIndex = -1;
+        }
+    });
+}
+
+// Update active autocomplete item
+function updateAutocompleteActive(items) {
+    items.forEach((item, index) => {
+        if (index === autocompleteIndex) {
+            item.classList.add('active');
+            item.scrollIntoView({ block: 'nearest' });
+        } else {
+            item.classList.remove('active');
+        }
+    });
+}
+
+// Populate notes for an existing term
+async function populateNotesForTerm(term) {
+    const notesTextarea = document.getElementById('notes');
+
+    if (!term) return;
+
+    // Check if this term already exists in our entries
+    const existingEntry = allEntries.find(entry =>
+        entry.term.toLowerCase() === term.toLowerCase()
+    );
+
+    if (existingEntry) {
+        // Fetch notes for this term
+        try {
+            const response = await fetch('/api/notes');
+            const data = await response.json();
+            const noteEntry = data.notes.find(n => n.term.toLowerCase() === term.toLowerCase());
+
+            if (noteEntry && noteEntry.notes) {
+                // Only populate if notes field is currently empty
+                if (!notesTextarea.value.trim()) {
+                    notesTextarea.value = noteEntry.notes;
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching notes:', error);
+        }
+    }
+}
+
+// Handle term field blur to auto-populate notes
+async function handleTermBlur() {
+    const termInput = document.getElementById('term');
+    const term = termInput.value.trim();
+    await populateNotesForTerm(term);
+}
+
+// Handle book dropdown change (for "Other" option)
+function handleBookChange(e) {
+    if (e.target.value === 'other') {
+        // Set the source to track which dropdown triggered the modal
+        document.getElementById('addBookSource').value = 'book';
+        // Open the Add Book Modal
+        document.getElementById('addBookModal').classList.add('show');
+        document.getElementById('addBookModalNumber').focus();
+        // Reset the dropdown to empty
+        e.target.value = '';
+    }
+}
+
+// Handle edit book dropdown change (for "Other" option)
+function handleEditBookChange(e) {
+    if (e.target.value === 'other') {
+        // Set the source to track which dropdown triggered the modal
+        document.getElementById('addBookSource').value = 'editBook';
+        // Open the Add Book Modal
+        document.getElementById('addBookModal').classList.add('show');
+        document.getElementById('addBookModalNumber').focus();
+        // Reset the dropdown to empty
+        e.target.value = '';
+    }
+}
+
+// Close add book modal
+function closeAddBookModal() {
+    document.getElementById('addBookModal').classList.remove('show');
+    document.getElementById('addBookModalForm').reset();
+}
+
+// Handle add book modal form submission
+async function handleAddBookModal(e) {
+    e.preventDefault();
+
+    const bookNumber = document.getElementById('addBookModalNumber').value.trim();
+    const bookName = document.getElementById('addBookModalName').value.trim();
+    const pageCount = document.getElementById('addBookModalPages').value.trim();
+    const source = document.getElementById('addBookSource').value;
+
+    if (!bookNumber || !bookName) {
+        showMessage('Book number and name are required', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/books/add', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                book_number: bookNumber,
+                book_name: bookName,
+                page_count: pageCount
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showMessage(data.message, 'success');
+            closeAddBookModal();
+
+            // Refresh all book dropdowns
+            await loadBookDropdowns();
+
+            // Select the newly added book in the dropdown that triggered the modal
+            if (source === 'book') {
+                document.getElementById('book').value = bookNumber;
+            } else if (source === 'editBook') {
+                document.getElementById('editBook').value = bookNumber;
+            }
+
+            // If we're on the settings tab, refresh the books list
+            const activeTab = document.querySelector('.tab-content.active');
+            if (activeTab && activeTab.id === 'tab-settings') {
+                loadBooks();
+            }
+        } else {
+            showMessage(data.error || 'Failed to add book', 'error');
+        }
+    } catch (error) {
+        showMessage('Error: ' + error.message, 'error');
+    }
+}
+
+// Handle book filter change
+function handleBookFilter(e) {
+    selectedBookFilter = e.target.value;
+    // Reset letter selection when changing book filter
+    selectedLetter = null;
+    buildLetterNavigation();
+    displayEntries(allEntries);
+}
+
+// Handle global keyboard shortcuts
+function handleGlobalKeyboardShortcuts(e) {
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+    const modifierKey = isMac ? e.metaKey : e.ctrlKey;
+
+    // Don't trigger shortcuts when typing in input fields (except Esc)
+    const isInputField = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName);
+
+    // Esc - Close modals
+    if (e.key === 'Escape') {
+        // Close any open modals
+        if (document.getElementById('editModal').classList.contains('show')) {
+            closeEditModal();
+        } else if (document.getElementById('editNotesModal').classList.contains('show')) {
+            closeEditNotesModal();
+        } else if (document.getElementById('gapActionModal').classList.contains('show')) {
+            closeGapActionModal();
+        } else if (document.getElementById('reincludeModal').classList.contains('show')) {
+            closeReincludeModal();
+        } else if (document.getElementById('editBookModal').classList.contains('show')) {
+            closeEditBookModal();
+        } else if (document.getElementById('addBookModal').classList.contains('show')) {
+            closeAddBookModal();
+        }
+        return;
+    }
+
+    // / (forward slash) - Focus search or term input (common pattern like GitHub/Slack)
+    // Only when not in an input field
+    if (e.key === '/' && !isInputField) {
+        e.preventDefault();
+        const activeTab = document.querySelector('.tab-content.active');
+        if (activeTab && activeTab.id === 'tab-view') {
+            document.getElementById('searchInput').focus();
+        } else if (activeTab && activeTab.id === 'tab-notes') {
+            document.getElementById('notesSearchInput').focus();
+        } else if (activeTab && activeTab.id === 'tab-add') {
+            document.getElementById('term').focus();
+        }
+        return;
+    }
+
+    // Don't process other shortcuts if in an input field
+    if (isInputField && e.key !== 'Escape') {
+        return;
+    }
+
+    // Number keys 1-6 - Navigate between tabs
+    const tabMap = {
+        '1': 'add',
+        '2': 'view',
+        '3': 'notes',
+        '4': 'books',
+        '5': 'tools',
+        '6': 'settings'
+    };
+
+    if (tabMap[e.key]) {
+        e.preventDefault();
+        switchTab(tabMap[e.key]);
+    }
+
+    // Ctrl/Cmd + S - Save current form (prevent browser save dialog)
+    if (modifierKey && e.key === 's') {
+        e.preventDefault();
+        // Could trigger submit on active form if needed
+    }
+}
+
+// Number-only validation for page fields
+function setupNumberOnlyFields() {
+    const numberFields = [
+        document.getElementById('page'),
+        document.getElementById('pageEnd'),
+        document.getElementById('editPage'),
+        document.getElementById('editPageEnd'),
+        document.getElementById('settingsIndexYear')
+    ];
+
+    numberFields.forEach(field => {
+        if (field) {
+            field.addEventListener('input', function(e) {
+                // Remove any non-digit characters
+                this.value = this.value.replace(/[^0-9]/g, '');
+            });
+        }
+    });
+}
+
+// Run gap analysis
+async function runGapAnalysis() {
+    const resultsContainer = document.getElementById('gapAnalysisResults');
+    resultsContainer.innerHTML = '<p class="loading">Running gap analysis...</p>';
+
+    try {
+        const response = await fetch('/api/gap-analysis');
+        const data = await response.json();
+
+        if (response.ok) {
+            displayGapAnalysis(data.results);
+        } else {
+            resultsContainer.innerHTML = `<p class="empty-state error">${data.error || 'Failed to run gap analysis'}</p>`;
+        }
+    } catch (error) {
+        resultsContainer.innerHTML = `<p class="empty-state error">Error: ${error.message}</p>`;
+    }
+}
+
+// Display gap analysis results
+function displayGapAnalysis(results) {
+    const container = document.getElementById('gapAnalysisResults');
+
+    if (results.length === 0) {
+        container.innerHTML = '<p class="empty-state">No books found. Add books in Settings to perform gap analysis.</p>';
+        return;
+    }
+
+    let html = '<div class="gap-analysis-results">';
+
+    results.forEach(result => {
+        const totalPages = result.page_count;
+        const gapsCount = result.gaps.length;
+
+        // Calculate gap pages
+        const gapPages = result.gaps.reduce((sum, gap) => {
+            if (gap.includes('-')) {
+                const [start, end] = gap.split('-').map(Number);
+                return sum + (end - start + 1);
+            }
+            return sum + 1;
+        }, 0);
+
+        // Calculate excluded pages
+        const excludedPages = (result.excluded || []).reduce((sum, gap) => {
+            if (gap.includes('-')) {
+                const [start, end] = gap.split('-').map(Number);
+                return sum + (end - start + 1);
+            }
+            return sum + 1;
+        }, 0);
+
+        const coveredPages = totalPages - gapPages;
+        const coveragePercent = totalPages > 0 ? ((coveredPages / totalPages) * 100).toFixed(1) : 0;
+
+        const exclusionCount = (result.excluded || []).length;
+
+        html += `<div class="gap-book">`;
+        html += `<div class="gap-book-header">`;
+        html += `<h3>Book ${escapeHtml(result.book_number)}: ${escapeHtml(result.book_name)}</h3>`;
+        html += `<div class="gap-stats">`;
+        html += `<span class="gap-stat">Total Pages: ${totalPages}</span>`;
+        html += `<span class="gap-stat">Indexed Terms: ${result.term_count || 0}</span>`;
+        html += `<span class="gap-stat">Coverage: ${coveragePercent}%</span>`;
+        html += `<span class="gap-stat">Gap Ranges: ${gapsCount}</span>`;
+        if (exclusionCount > 0) {
+            html += `<span class="gap-stat">Exclusion Ranges: ${exclusionCount}</span>`;
+        }
+        if (excludedPages > 0) {
+            html += `<span class="gap-stat">Excluded Pages: ${excludedPages}</span>`;
+        }
+        html += `</div>`;
+        html += `</div>`;
+
+        if (result.gaps.length === 0 && (result.excluded || []).length === 0) {
+            html += `<p class="gap-complete">✓ All pages indexed!</p>`;
+        } else {
+            if (result.gaps.length > 0) {
+                html += `<div class="gap-list">`;
+                html += `<strong>Missing pages:</strong> `;
+                html += result.gaps.map(gap =>
+                    `<span class="gap-range clickable" onclick="handleGapRangeClick('${escapeHtml(result.book_number)}', '${escapeHtml(gap)}')">${escapeHtml(gap)}</span>`
+                ).join(', ');
+                html += `</div>`;
+            }
+
+            if (result.excluded && result.excluded.length > 0) {
+                html += `<div class="gap-list excluded-list">`;
+                html += `<strong>Page exclusions:</strong> `;
+                html += result.excluded.map(gap =>
+                    `<span class="gap-range excluded clickable" onclick="reincludeGapRange('${escapeHtml(result.book_number)}', '${escapeHtml(gap)}')">${escapeHtml(gap)}</span>`
+                ).join(', ');
+                html += `</div>`;
+            }
+        }
+
+        html += `</div>`;
+    });
+
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+// Store current gap action context
+let currentGapAction = {
+    bookNumber: null,
+    pageRange: null
+};
+
+// Handle click on gap range - present options
+function handleGapRangeClick(bookNumber, pageRange) {
+    currentGapAction.bookNumber = bookNumber;
+    currentGapAction.pageRange = pageRange;
+
+    document.getElementById('gapActionTitle').textContent = `Missing Pages: ${pageRange}`;
+    document.getElementById('gapActionMessage').textContent = `Book ${bookNumber} - What would you like to do with pages ${pageRange}?`;
+    document.getElementById('gapActionModal').classList.add('show');
+}
+
+// Close gap action modal
+function closeGapActionModal() {
+    document.getElementById('gapActionModal').classList.remove('show');
+    currentGapAction.bookNumber = null;
+    currentGapAction.pageRange = null;
+}
+
+// Handle create reference action from modal
+function gapActionCreateReference() {
+    // Save values before closing modal (which nulls them)
+    const bookNumber = currentGapAction.bookNumber;
+    const pageRange = currentGapAction.pageRange;
+    closeGapActionModal();
+    createReferenceFromGap(bookNumber, pageRange);
+}
+
+// Handle exclude action from modal
+function gapActionExclude() {
+    // Save values before closing modal (which nulls them)
+    const bookNumber = currentGapAction.bookNumber;
+    const pageRange = currentGapAction.pageRange;
+    closeGapActionModal();
+    excludeGapRange(bookNumber, pageRange);
+}
+
+// Create reference from gap range
+function createReferenceFromGap(bookNumber, pageRange) {
+    // Parse the page range to get the start page
+    let startPage;
+    if (pageRange.includes('-')) {
+        startPage = pageRange.split('-')[0];
+    } else {
+        startPage = pageRange;
+    }
+
+    // Switch to Add Entry tab
+    switchTab('add');
+
+    // Use setTimeout to ensure tab switch completes before setting values
+    setTimeout(() => {
+        // Pre-populate the form
+        document.getElementById('book').value = bookNumber;
+        document.getElementById('page').value = startPage;
+        document.getElementById('pageEnd').value = '';
+
+        // Clear term and notes
+        document.getElementById('term').value = '';
+        document.getElementById('notes').value = '';
+
+        // Focus on term field
+        document.getElementById('term').focus();
+
+        showMessage(`Book ${bookNumber}, page ${startPage} - ready to add reference`, 'success');
+    }, 100);
+}
+
+// Exclude a gap range from analysis
+async function excludeGapRange(bookNumber, pageRange) {
+    try {
+        const response = await fetch('/api/gap-exclusions/add', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                book_number: bookNumber,
+                page_range: pageRange
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showMessage(data.message, 'success');
+            runGapAnalysis(); // Refresh the analysis
+        } else {
+            showMessage(data.error || 'Failed to exclude range', 'error');
+        }
+    } catch (error) {
+        showMessage('Error: ' + error.message, 'error');
+    }
+}
+
+// Store current re-include action context
+let currentReincludeAction = {
+    bookNumber: null,
+    pageRange: null
+};
+
+// Handle click on excluded range - show re-include modal
+function reincludeGapRange(bookNumber, pageRange) {
+    currentReincludeAction.bookNumber = bookNumber;
+    currentReincludeAction.pageRange = pageRange;
+
+    document.getElementById('reincludeTitle').textContent = `Re-include Pages: ${pageRange}`;
+    document.getElementById('reincludeMessage').textContent = `Book ${bookNumber} - Re-including pages ${pageRange} will make them appear as gaps again in the gap analysis.`;
+    document.getElementById('reincludeModal').classList.add('show');
+}
+
+// Close re-include modal
+function closeReincludeModal() {
+    document.getElementById('reincludeModal').classList.remove('show');
+    currentReincludeAction.bookNumber = null;
+    currentReincludeAction.pageRange = null;
+}
+
+// Confirm re-include action
+async function confirmReinclude() {
+    // Save values before closing modal
+    const bookNumber = currentReincludeAction.bookNumber;
+    const pageRange = currentReincludeAction.pageRange;
+    closeReincludeModal();
+
+    try {
+        const response = await fetch('/api/gap-exclusions/remove', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                book_number: bookNumber,
+                page_range: pageRange
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showMessage(data.message, 'success');
+            runGapAnalysis(); // Refresh the analysis
+        } else {
+            showMessage(data.error || 'Failed to re-include pages', 'error');
+        }
+    } catch (error) {
+        showMessage('Error: ' + error.message, 'error');
+    }
+}
