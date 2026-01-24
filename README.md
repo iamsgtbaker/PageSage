@@ -1,4 +1,4 @@
-# Book Index Manager
+# Index it!
 
 A comprehensive offline application for creating and managing book indexes with both command-line and web interfaces.
 
