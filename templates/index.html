@@ -16,6 +16,13 @@
                     <p class="subtitle" id="indexName">Create and manage your book index offline</p>
                 </div>
             </div>
+
+            <!-- Hamburger Menu Button -->
+            <nav id="headerNav">
+                <ul>
+                    <li><a href="#menu" aria-label="Menu"><span class="sr-only">Menu</span></a></li>
+                </ul>
+            </nav>
         </header>
 
         <!-- Tab Navigation -->
@@ -485,6 +492,157 @@
                         <button type="button" class="btn btn-secondary" onclick="closeAddBookModal()">Cancel</button>
                     </div>
                 </form>
+            </div>
+        </div>
+
+        <!-- Hamburger Menu Panel -->
+        <nav id="menu">
+            <div class="inner">
+                <h2>Menu</h2>
+                <ul>
+                    <!-- Mobile Quick Access (hidden on desktop) -->
+                    <li class="mobile-only"><a href="#" onclick="menuNavigate('add'); return false;">Add Entry</a></li>
+                    <li class="mobile-only"><a href="#" onclick="menuNavigate('view'); return false;">View Entries</a></li>
+                    <li class="mobile-only"><a href="#" onclick="menuNavigate('notes'); return false;">Notes</a></li>
+                    <li class="mobile-only"><a href="#" onclick="menuNavigate('books'); return false;">Books</a></li>
+                    <li class="mobile-only"><a href="#" onclick="menuNavigate('tools'); return false;">Tools</a></li>
+                    <li class="mobile-only"><a href="#" onclick="menuNavigate('settings'); return false;">Settings</a></li>
+                    <li class="mobile-only menu-divider"></li>
+
+                    <!-- Info links (all devices) -->
+                    <li><a href="#" onclick="showAboutModal(); return false;">About</a></li>
+                    <li><a href="#" onclick="showHelpModal(); return false;">Help</a></li>
+                    <li><a href="https://github.com/iamsgtbaker/IndexIt" target="_blank" rel="noopener">GitHub</a></li>
+                    <li><a href="#" onclick="showCoffeeModal(); return false;">Buy me a coffee</a></li>
+                </ul>
+            </div>
+        </nav>
+
+        <!-- About Modal -->
+        <div id="aboutModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>About Index it!</h2>
+                    <button class="modal-close" onclick="closeAboutModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p style="font-size: 1.1em; margin-bottom: 1em;"><strong>Index it!</strong> - Create and manage your book index offline</p>
+
+                    <p style="margin-bottom: 1.5em; color: var(--secondary-color);">
+                        <strong>Version:</strong> 1.0 &nbsp;|&nbsp; <strong>Year:</strong> 2026
+                    </p>
+
+                    <p style="font-style: italic; color: var(--primary-color); margin-bottom: 2em;">
+                        Build your exam reference, fast • Your open-book advantage
+                    </p>
+
+                    <h3 style="margin-top: 1.5em; margin-bottom: 0.75em; color: var(--text-color);">Features</h3>
+                    <ul style="list-style: none; padding-left: 0; margin-bottom: 1.5em;">
+                        <li style="padding: 0.4em 0;">📚 Multi-book index management</li>
+                        <li style="padding: 0.4em 0;">📝 Term tracking with notes</li>
+                        <li style="padding: 0.4em 0;">🔍 Fast search and filtering</li>
+                        <li style="padding: 0.4em 0;">📊 Gap analysis for coverage tracking</li>
+                        <li style="padding: 0.4em 0;">💾 Export to LaTeX, PDF, Markdown, Plain Text</li>
+                        <li style="padding: 0.4em 0;">🌐 Works completely offline</li>
+                    </ul>
+
+                    <h3 style="margin-top: 1.5em; margin-bottom: 0.75em; color: var(--text-color);">Technology</h3>
+                    <p style="margin-bottom: 1em;">
+                        Built with Python Flask, SQLite, and vanilla JavaScript. No frameworks, no tracking, no cloud dependencies.
+                    </p>
+
+                    <p style="margin-top: 1.5em; font-size: 0.9em; color: var(--secondary-color);">
+                        Template design by <a href="http://html5up.net" target="_blank" rel="noopener" style="color: var(--primary-color);">HTML5 UP</a>
+                    </p>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeAboutModal()">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Help Modal -->
+        <div id="helpModal" class="modal">
+            <div class="modal-content" style="max-width: 700px;">
+                <div class="modal-header">
+                    <h2>Help & Keyboard Shortcuts</h2>
+                    <button class="modal-close" onclick="closeHelpModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <h3 style="margin-top: 0; margin-bottom: 1em; color: var(--text-color);">Keyboard Shortcuts</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 2em;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid var(--border-color);">
+                                <th style="text-align: left; padding: 0.75em 1em; font-weight: 700;">Key</th>
+                                <th style="text-align: left; padding: 0.75em 1em; font-weight: 700;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="border-bottom: 1px solid var(--border-color);">
+                                <td style="padding: 0.75em 1em;"><code style="background: var(--hover-color); padding: 0.2em 0.5em; border-radius: 3px;">1-6</code></td>
+                                <td style="padding: 0.75em 1em;">Navigate to tabs (1=Add Entry, 2=View, 3=Notes, 4=Books, 5=Tools, 6=Settings)</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--border-color);">
+                                <td style="padding: 0.75em 1em;"><code style="background: var(--hover-color); padding: 0.2em 0.5em; border-radius: 3px;">/</code></td>
+                                <td style="padding: 0.75em 1em;">Focus search or term input</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--border-color);">
+                                <td style="padding: 0.75em 1em;"><code style="background: var(--hover-color); padding: 0.2em 0.5em; border-radius: 3px;">Esc</code></td>
+                                <td style="padding: 0.75em 1em;">Close modals or hamburger menu</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h3 style="margin-top: 1.5em; margin-bottom: 1em; color: var(--text-color);">Quick Start Guide</h3>
+
+                    <h4 style="margin-top: 1em; margin-bottom: 0.5em; font-size: 1em; color: var(--primary-color);">1. Add Books</h4>
+                    <p style="margin-bottom: 1em;">Go to the <strong>Books</strong> tab and add your textbooks with their numbers and versions.</p>
+
+                    <h4 style="margin-top: 1em; margin-bottom: 0.5em; font-size: 1em; color: var(--primary-color);">2. Create Index Entries</h4>
+                    <p style="margin-bottom: 1em;">On the <strong>Add Entry</strong> tab, enter terms with book:page references (e.g., "1:42" or "2:15-18" for page ranges).</p>
+
+                    <h4 style="margin-top: 1em; margin-bottom: 0.5em; font-size: 1em; color: var(--primary-color);">3. Add Notes</h4>
+                    <p style="margin-bottom: 1em;">Add study notes to any term. View all notes in the <strong>Notes</strong> tab.</p>
+
+                    <h4 style="margin-top: 1em; margin-bottom: 0.5em; font-size: 1em; color: var(--primary-color);">4. Export Your Index</h4>
+                    <p style="margin-bottom: 1em;">Use the <strong>Tools</strong> tab to export your index to LaTeX, PDF, or other formats.</p>
+
+                    <h4 style="margin-top: 1em; margin-bottom: 0.5em; font-size: 1em; color: var(--primary-color);">5. Gap Analysis</h4>
+                    <p style="margin-bottom: 1em;">Check which pages aren't indexed yet in the <strong>Tools</strong> tab under Gap Analysis.</p>
+
+                    <h3 style="margin-top: 1.5em; margin-bottom: 1em; color: var(--text-color);">Tips</h3>
+                    <ul style="list-style: disc; padding-left: 1.5em;">
+                        <li style="margin-bottom: 0.5em;">Use the autocomplete on the term field to quickly reference existing terms</li>
+                        <li style="margin-bottom: 0.5em;">Click references to edit them directly from the View Entries tab</li>
+                        <li style="margin-bottom: 0.5em;">Export your database regularly from the Settings tab as a backup</li>
+                    </ul>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeHelpModal()">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Buy Me a Coffee Modal -->
+        <div id="coffeeModal" class="modal">
+            <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h2>Buy Me a Coffee</h2>
+                    <button class="modal-close" onclick="closeCoffeeModal()">&times;</button>
+                </div>
+                <div class="modal-body" style="text-align: center; padding: 2em 1em;">
+                    <div style="font-size: 4em; margin-bottom: 0.5em;">☕</div>
+                    <h3 style="color: var(--primary-color); margin-bottom: 1em;">Coming Soon!</h3>
+                    <p style="margin-bottom: 1.5em; color: var(--secondary-color);">
+                        Stay tuned for ways to support Index it! development.
+                    </p>
+                    <p style="font-size: 0.9em; color: var(--secondary-color);">
+                        In the meantime, feel free to star the project on <a href="https://github.com/iamsgtbaker/IndexIt" target="_blank" rel="noopener" style="color: var(--primary-color);">GitHub</a>!
+                    </p>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeCoffeeModal()">Close</button>
+                </div>
             </div>
         </div>
 

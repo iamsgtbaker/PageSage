@@ -52,6 +52,73 @@ function startTaglineRotation() {
     }, 4000); // Rotate every 4 seconds
 }
 
+// Hamburger Menu Control
+let menuLocked = false;
+
+function menuLock() {
+    if (menuLocked) return false;
+    menuLocked = true;
+    setTimeout(() => { menuLocked = false; }, 350);
+    return true;
+}
+
+function menuShow() {
+    if (menuLock()) {
+        document.body.classList.add('is-menu-visible');
+    }
+}
+
+function menuHide() {
+    if (menuLock()) {
+        document.body.classList.remove('is-menu-visible');
+    }
+}
+
+function menuToggle() {
+    if (menuLock()) {
+        document.body.classList.toggle('is-menu-visible');
+    }
+}
+
+function menuNavigate(tabName) {
+    menuHide();
+    setTimeout(() => { switchTab(tabName); }, 350);
+}
+
+// Modal Functions
+function showAboutModal() {
+    menuHide();
+    setTimeout(() => {
+        document.getElementById('aboutModal').classList.add('show');
+    }, 350);
+}
+
+function closeAboutModal() {
+    document.getElementById('aboutModal').classList.remove('show');
+}
+
+function showHelpModal() {
+    menuHide();
+    setTimeout(() => {
+        document.getElementById('helpModal').classList.add('show');
+    }, 350);
+}
+
+function closeHelpModal() {
+    document.getElementById('helpModal').classList.remove('show');
+}
+
+function showCoffeeModal() {
+    menuHide();
+    setTimeout(() => {
+        document.getElementById('coffeeModal').classList.add('show');
+    }, 350);
+}
+
+function closeCoffeeModal() {
+    document.getElementById('coffeeModal').classList.remove('show');
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     loadEntries();
@@ -105,6 +172,64 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('addBookModal').addEventListener('click', function(e) {
         if (e.target.id === 'addBookModal') {
             closeAddBookModal();
+        }
+    });
+
+    // Setup hamburger menu
+    const menuToggleButton = document.querySelector('a[href="#menu"]');
+    const menuPanel = document.getElementById('menu');
+
+    if (menuToggleButton && menuPanel) {
+        // Toggle menu on button click
+        menuToggleButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            menuToggle();
+        });
+
+        // Stop propagation when clicking inside menu
+        menuPanel.addEventListener('click', function(e) {
+            e.stopPropagation();
+        });
+
+        // Close menu on background click
+        document.body.addEventListener('click', function(e) {
+            if (document.body.classList.contains('is-menu-visible')) {
+                if (!menuPanel.contains(e.target) && !menuToggleButton.contains(e.target)) {
+                    menuHide();
+                }
+            }
+        });
+
+        // Append close button to menu
+        const closeButton = document.createElement('a');
+        closeButton.href = '#menu';
+        closeButton.className = 'close';
+        closeButton.innerHTML = '<span class="sr-only">Close</span>';
+        closeButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            menuHide();
+        });
+        menuPanel.appendChild(closeButton);
+    }
+
+    // Setup modal background clicks for new modals
+    document.getElementById('aboutModal').addEventListener('click', function(e) {
+        if (e.target.id === 'aboutModal') {
+            closeAboutModal();
+        }
+    });
+
+    document.getElementById('helpModal').addEventListener('click', function(e) {
+        if (e.target.id === 'helpModal') {
+            closeHelpModal();
+        }
+    });
+
+    document.getElementById('coffeeModal').addEventListener('click', function(e) {
+        if (e.target.id === 'coffeeModal') {
+            closeCoffeeModal();
         }
     });
 
@@ -1782,8 +1907,14 @@ function handleGlobalKeyboardShortcuts(e) {
     // Don't trigger shortcuts when typing in input fields (except Esc)
     const isInputField = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName);
 
-    // Esc - Close modals
+    // Esc - Close hamburger menu or modals
     if (e.key === 'Escape') {
+        // Close hamburger menu first if open
+        if (document.body.classList.contains('is-menu-visible')) {
+            menuHide();
+            return;
+        }
+
         // Close any open modals
         if (document.getElementById('editModal').classList.contains('show')) {
             closeEditModal();
@@ -1797,6 +1928,12 @@ function handleGlobalKeyboardShortcuts(e) {
             closeEditBookModal();
         } else if (document.getElementById('addBookModal').classList.contains('show')) {
             closeAddBookModal();
+        } else if (document.getElementById('aboutModal').classList.contains('show')) {
+            closeAboutModal();
+        } else if (document.getElementById('helpModal').classList.contains('show')) {
+            closeHelpModal();
+        } else if (document.getElementById('coffeeModal').classList.contains('show')) {
+            closeCoffeeModal();
         }
         return;
     }
