@@ -19,7 +19,7 @@
     --text-color: #585858;           /* Phantom dark gray text */
     --border-color: #c9c9c9;         /* Phantom border gray */
     --hover-color: #f6f6f6;          /* Phantom light gray hover */
-    --menu-bg: #3a3a3a;              /* Menu background - darker gray */
+    --menu-bg: #585858;              /* Menu background */
     --menu-text: #ffffff;            /* Menu text color */
 }
 
@@ -1286,7 +1286,7 @@ footer {
 }
 
 #menu > .inner > ul > li a:hover {
-    color: var(--primary-color);
+    color: var(--secondary-color);
 }
 
 #menu > .inner > ul > li:first-child {
