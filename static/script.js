@@ -297,10 +297,10 @@ function toggleRecentEntries() {
 
     if (container.classList.contains('collapsed')) {
         container.classList.remove('collapsed');
-        toggle.textContent = '-';
+        toggle.textContent = '▼';
     } else {
         container.classList.add('collapsed');
-        toggle.textContent = '+';
+        toggle.textContent = '▶';
     }
 }
 
@@ -316,7 +316,7 @@ function toggleToolsSection(section) {
             // Toggle the clicked section
             if (container.classList.contains('collapsed')) {
                 container.classList.remove('collapsed');
-                toggle.textContent = '-';
+                toggle.textContent = '▼';
 
                 // Run gap analysis if opening gaps section
                 if (section === 'gaps') {
@@ -324,12 +324,12 @@ function toggleToolsSection(section) {
                 }
             } else {
                 container.classList.add('collapsed');
-                toggle.textContent = '+';
+                toggle.textContent = '▶';
             }
         } else {
             // Collapse other sections
             container.classList.add('collapsed');
-            toggle.textContent = '+';
+            toggle.textContent = '▶';
         }
     });
 }
@@ -341,10 +341,10 @@ function toggleCsvFormat() {
 
     if (container.classList.contains('collapsed')) {
         container.classList.remove('collapsed');
-        toggle.textContent = '-';
+        toggle.textContent = '▼';
     } else {
         container.classList.add('collapsed');
-        toggle.textContent = '+';
+        toggle.textContent = '▶';
     }
 }
 

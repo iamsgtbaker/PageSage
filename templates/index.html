@@ -86,9 +86,9 @@
         </div>
 
         <div class="card">
-            <h3 class="collapsible-heading" onclick="toggleRecentEntries()">
-                <span id="recentEntriesToggle">-</span> Recently Added
-            </h3>
+            <h2 class="collapsible-heading" onclick="toggleRecentEntries()">
+                <span id="recentEntriesToggle">▼</span> Recently Added
+            </h2>
             <div id="recentEntriesContainer" class="recent-entries-container">
                 <div id="recentEntriesList" class="recent-entries-list">
                     <p class="loading">Loading...</p>
@@ -187,16 +187,18 @@
 
         <!-- Tools Tab -->
         <div id="tab-tools" class="tab-content">
+        <h2 style="margin-bottom: 1.5rem; text-transform: uppercase; color: var(--text-color); font-size: 1.5rem; letter-spacing: 0.2em;">Tools</h2>
+
         <!-- Import Section -->
         <div class="card">
             <h3 class="collapsible-heading" onclick="toggleToolsSection('import')">
-                <span id="importToggle">+</span> Import from CSV
+                <span id="importToggle">▶</span> Import from CSV
             </h3>
             <div id="importContainer" class="collapsible-container collapsed">
                 <div id="importMessage" class="message"></div>
                 <p>Paste your CSV data below. Each line can have multiple references for the same term.</p>
                 <h4 class="collapsible-heading" onclick="toggleCsvFormat()" style="font-size: 1rem; margin-top: 1rem;">
-                    <span id="csvFormatToggle">+</span> CSV Format Help
+                    <span id="csvFormatToggle">▶</span> CSV Format Help
                 </h4>
                 <div id="csvFormatHelp" class="collapsible-container collapsed">
                     <p class="format-help">Format: <code>term,reference1,reference2,...</code><br>
@@ -221,7 +223,7 @@
         <!-- Export Section -->
         <div class="card">
             <h3 class="collapsible-heading" onclick="toggleToolsSection('export')">
-                <span id="exportToggle">+</span> Export
+                <span id="exportToggle">▶</span> Export
             </h3>
             <div id="exportContainer" class="collapsible-container collapsed">
                 <h4 style="margin-top: 1.5rem;">Export Index</h4>
@@ -256,7 +258,7 @@
         <!-- Gap Analysis Section -->
         <div class="card">
             <h3 class="collapsible-heading" onclick="toggleToolsSection('gaps')">
-                <span id="gapsToggle">+</span> Gap Analysis
+                <span id="gapsToggle">▶</span> Gap Analysis
             </h3>
             <div id="gapsContainer" class="collapsible-container collapsed">
                 <p>Identify pages that may not have been indexed for each registered book. Click on missing pages to create a reference or exclude them from the analysis.</p>
