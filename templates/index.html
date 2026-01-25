@@ -53,8 +53,9 @@
                                    autocomplete="off">
                             <div id="autocomplete-list" class="autocomplete-items"></div>
                         </div>
+                        <small style="display: block; margin-top: 0.25rem;">Leave blank to add only a note</small>
                     </div>
-                    
+
                     <div class="form-group form-group-ref">
                         <label>Reference:</label>
                         <div class="reference-inputs">
@@ -70,7 +71,6 @@
                                    placeholder="End" class="ref-input" style="width: 65px;"
                                    pattern="[0-9]*" inputmode="numeric">
                         </div>
-                        <small>Leave blank to add only a note</small>
                     </div>
                 </div>
 
@@ -86,8 +86,8 @@
         </div>
 
         <div class="card">
-            <h2 class="collapsible-heading" onclick="toggleRecentEntries()">
-                <span id="recentEntriesToggle">▼</span> Recently Added
+            <h2 class="collapsible-heading" onclick="toggleRecentEntries()" style="font-size: 1.3rem;">
+                <span id="recentEntriesToggle">▼</span> Recently Added Terms
             </h2>
             <div id="recentEntriesContainer" class="recent-entries-container">
                 <div id="recentEntriesList" class="recent-entries-list">
