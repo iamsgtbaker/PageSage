@@ -21,6 +21,7 @@
     --hover-color: #f6f6f6;          /* Phantom light gray hover */
     --menu-bg: #585858;              /* Menu background */
     --menu-text: #ffffff;            /* Menu text color */
+    --footer-color: #f6f6f6;         /* Footer background */
 }
 
 body {
@@ -38,36 +39,57 @@ body {
     padding: 2rem 1rem;
 }
 
-/* Tab Styles */
+/* Tab Styles - Skewed Block Design */
 .tabs {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 0;
-    border-bottom: 2px solid var(--border-color);
+    display: inline-block;
+    margin: 0 auto 2rem;
+    padding: 0;
+    list-style: none;
+    transform: skew(-25deg);
+    text-align: center;
 }
 
 .tab-button {
-    padding: 0.75rem 1.5rem;
-    background: none;
+    background: #ffffff;
+    float: left;
     border: none;
-    border-bottom: 3px solid transparent;
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--secondary-color);
+    border-right: 1px solid var(--border-color);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    text-transform: uppercase;
+    color: var(--text-color);
+    font-weight: 900;
+    font-size: 0.85rem;
+    letter-spacing: 0.15em;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.3s ease;
+    padding: 0;
     position: relative;
-    bottom: -2px;
+}
+
+.tab-button:first-child {
+    border-radius: 7px 0 0 7px;
+}
+
+.tab-button:last-child {
+    border-right: none;
+    border-radius: 0 7px 7px 0;
 }
 
 .tab-button:hover {
-    color: var(--primary-color);
-    background-color: var(--hover-color);
+    background: var(--hover-color);
+    color: var(--secondary-color);
 }
 
 .tab-button.active {
-    color: var(--primary-color);
-    border-bottom-color: var(--primary-color);
+    background: var(--secondary-color);
+    color: #ffffff;
+}
+
+/* Inner span to counter the skew */
+.tab-button span {
+    display: block;
+    padding: 1em 2em;
+    transform: skew(25deg);
 }
 
 .tab-content {
