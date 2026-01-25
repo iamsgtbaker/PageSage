@@ -112,17 +112,6 @@ function closeHelpModal() {
     document.getElementById('helpModal').classList.remove('show');
 }
 
-function showCoffeeModal() {
-    menuHide();
-    setTimeout(() => {
-        document.getElementById('coffeeModal').classList.add('show');
-    }, 350);
-}
-
-function closeCoffeeModal() {
-    document.getElementById('coffeeModal').classList.remove('show');
-}
-
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     loadEntries();
@@ -228,12 +217,6 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('helpModal').addEventListener('click', function(e) {
         if (e.target.id === 'helpModal') {
             closeHelpModal();
-        }
-    });
-
-    document.getElementById('coffeeModal').addEventListener('click', function(e) {
-        if (e.target.id === 'coffeeModal') {
-            closeCoffeeModal();
         }
     });
 
@@ -1936,8 +1919,6 @@ function handleGlobalKeyboardShortcuts(e) {
             closeAboutModal();
         } else if (document.getElementById('helpModal').classList.contains('show')) {
             closeHelpModal();
-        } else if (document.getElementById('coffeeModal').classList.contains('show')) {
-            closeCoffeeModal();
         }
         return;
     }
