@@ -42,7 +42,7 @@ body {
 /* Tab Styles - Skewed Block Design */
 .tabs {
     display: inline-block;
-    margin: 0 auto 2rem;
+    margin: 0 auto 1rem;
     padding: 0;
     list-style: none;
     transform: skew(-25deg);
@@ -53,7 +53,7 @@ body {
     background: #ffffff;
     float: left;
     border: none;
-    border-right: 1px solid var(--border-color);
+    border-right: 1px solid var(--text-color);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     text-transform: uppercase;
     color: var(--text-color);
@@ -1009,7 +1009,6 @@ footer {
     text-align: center;
     margin-top: 3rem;
     padding-top: 2rem;
-    border-top: 1px solid var(--border-color);
     color: var(--secondary-color);
 }
 
