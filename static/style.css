@@ -114,6 +114,41 @@ header {
     flex: 1;
 }
 
+/* Logo styling (Phantom template style) */
+.logo {
+    display: inline-block;
+    border-bottom: 0;
+    color: inherit;
+    font-weight: 900;
+    letter-spacing: 0.35em;
+    margin: 0 0 2.5em 0;
+    text-decoration: none;
+    text-transform: uppercase;
+}
+
+.logo > * {
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.logo .symbol {
+    margin-right: 0.65em;
+}
+
+.logo .symbol img {
+    display: block;
+    width: 2em;
+    height: 2em;
+}
+
+.logo .title {
+    font-size: 2.75em;
+    font-weight: 700;
+    line-height: 1.3;
+    letter-spacing: -0.035em;
+    color: var(--primary-color);
+}
+
 h1 {
     font-size: 3rem;
     color: var(--primary-color);
