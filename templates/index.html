@@ -496,29 +496,6 @@
             </div>
         </div>
 
-        <!-- Hamburger Menu Panel -->
-        <nav id="menu">
-            <div class="inner">
-                <h2>Menu</h2>
-                <ul>
-                    <!-- Mobile Quick Access (hidden on desktop) -->
-                    <li class="mobile-only"><a href="#" onclick="menuNavigate('add'); return false;">Add Entry</a></li>
-                    <li class="mobile-only"><a href="#" onclick="menuNavigate('view'); return false;">View Entries</a></li>
-                    <li class="mobile-only"><a href="#" onclick="menuNavigate('notes'); return false;">Notes</a></li>
-                    <li class="mobile-only"><a href="#" onclick="menuNavigate('books'); return false;">Books</a></li>
-                    <li class="mobile-only"><a href="#" onclick="menuNavigate('tools'); return false;">Tools</a></li>
-                    <li class="mobile-only"><a href="#" onclick="menuNavigate('settings'); return false;">Settings</a></li>
-                    <li class="mobile-only menu-divider"></li>
-
-                    <!-- Info links (all devices) -->
-                    <li><a href="#" onclick="showAboutModal(); return false;">About</a></li>
-                    <li><a href="#" onclick="showHelpModal(); return false;">Help</a></li>
-                    <li><a href="https://github.com/iamsgtbaker/IndexIt" target="_blank" rel="noopener">GitHub</a></li>
-                    <li><a href="#" onclick="showCoffeeModal(); return false;">Buy me a coffee</a></li>
-                </ul>
-            </div>
-        </nav>
-
         <!-- About Modal -->
         <div id="aboutModal" class="modal">
             <div class="modal-content">
@@ -652,6 +629,29 @@
         </footer>
         </div>
     </div>
+
+    <!-- Hamburger Menu Panel (outside wrapper to avoid dimming) -->
+    <nav id="menu">
+        <div class="inner">
+            <h2>Menu</h2>
+            <ul>
+                <!-- Mobile Quick Access (hidden on desktop) -->
+                <li class="mobile-only"><a href="#" onclick="menuNavigate('add'); return false;">Add Entry</a></li>
+                <li class="mobile-only"><a href="#" onclick="menuNavigate('view'); return false;">View Entries</a></li>
+                <li class="mobile-only"><a href="#" onclick="menuNavigate('notes'); return false;">Notes</a></li>
+                <li class="mobile-only"><a href="#" onclick="menuNavigate('books'); return false;">Books</a></li>
+                <li class="mobile-only"><a href="#" onclick="menuNavigate('tools'); return false;">Tools</a></li>
+                <li class="mobile-only"><a href="#" onclick="menuNavigate('settings'); return false;">Settings</a></li>
+                <li class="mobile-only menu-divider"></li>
+
+                <!-- Info links (all devices) -->
+                <li><a href="#" onclick="showAboutModal(); return false;">About</a></li>
+                <li><a href="#" onclick="showHelpModal(); return false;">Help</a></li>
+                <li><a href="https://github.com/iamsgtbaker/IndexIt" target="_blank" rel="noopener">GitHub</a></li>
+                <li><a href="#" onclick="showCoffeeModal(); return false;">Buy me a coffee</a></li>
+            </ul>
+        </div>
+    </nav>
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
