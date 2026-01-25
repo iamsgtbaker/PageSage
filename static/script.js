@@ -34,7 +34,11 @@ const taglines = [
     "Build your exam reference, fast",
     "Your open-book advantage",
     "Find it when it counts",
-    "Never flip through 800 pages again"
+    "Never flip through 800 pages again", 
+    "Study smarter, not harder",
+    "From chaos to clarity",
+    "Ace your open-book exams",
+    "Your personal exam navigator"
 ];
 let currentTaglineIndex = 0;
 

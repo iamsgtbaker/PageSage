@@ -8,11 +8,12 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div class="container">
-        <header>
+    <div id="wrapper">
+        <div class="container">
+            <header id="header">
             <div class="header-content">
                 <div>
-                    <h1>📚 Index it!</h1>
+                    <h1>Index it!</h1>
                     <p class="subtitle" id="indexName">Create and manage your book index offline</p>
                 </div>
             </div>
@@ -649,6 +650,7 @@
         <footer>
             <p>Index it! • <span id="rotatingTagline">Build your exam reference, fast</span></p>
         </footer>
+        </div>
     </div>
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>
