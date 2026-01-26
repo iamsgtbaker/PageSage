@@ -29,30 +29,63 @@ class IndexFormatter:
         return '#'
 
     def format_latex_style(self, entries: List[Tuple[str, List[str]]],
-                           title: str = "Index") -> str:
+                           metadata: dict = None) -> str:
         """
         Format index entries in LaTeX style
         """
+        if metadata is None:
+            metadata = {'index_name': 'Index', 'books': [], 'custom_properties': []}
+
+        output = []
+
+        # Add header
+        output.append(f"% {metadata['index_name']}")
+        output.append(f"% Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        output.append("")
+
+        # Front page
+        output.append("\\begin{titlepage}")
+        output.append("\\centering")
+        output.append("")
+        output.append(f"\\vspace*{{2cm}}")
+        output.append(f"{{\\Huge \\textbf{{{self.escape_latex(metadata['index_name'])}}}\\par}}")
+        output.append("\\vspace{2cm}")
+        output.append("")
+
+        # Books
+        if metadata['books']:
+            output.append("\\textbf{Books:}\\\\[0.5cm]")
+            for book in metadata['books']:
+                page_info = f" ({book['page_count']} pages)" if book['page_count'] else ""
+                output.append(f"Book {book['book_number']}: {self.escape_latex(book['book_name'])}{page_info}\\\\")
+            output.append("\\vspace{1cm}")
+
+        # Custom properties
+        if metadata['custom_properties']:
+            output.append("\\textbf{Properties:}\\\\[0.5cm]")
+            for prop in metadata['custom_properties']:
+                output.append(f"{self.escape_latex(prop['name'])}: {self.escape_latex(prop['value'])}\\\\")
+            output.append("\\vspace{1cm}")
+
+        output.append("\\vfill")
+        output.append(f"{{\\small Generated: {datetime.now().strftime('%Y-%m-%d')}}}")
+        output.append("\\end{titlepage}")
+        output.append("")
+
         if not entries:
-            return "% Empty index\n"
+            output.append("% Empty index")
+            return "\n".join(output)
+
+        output.append("\\begin{theindex}")
+        output.append("")
 
         # Sort entries with "#" (special chars/numbers) at the end
         def sort_key(item):
             term = item[0]
             first_letter = self.normalize_first_letter(term)
-            # Put "#" at beginning, otherwise sort alphabetically
             return (first_letter != '#', term.lower())
 
         entries = sorted(entries, key=sort_key)
-
-        output = []
-
-        # Add header
-        output.append("% Book Index")
-        output.append(f"% Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        output.append("")
-        output.append("\\begin{theindex}")
-        output.append("")
 
         current_letter = None
 
@@ -83,31 +116,60 @@ class IndexFormatter:
         return "\n".join(output)
 
     def format_plain_text(self, entries: List[Tuple[str, List[str]]],
-                          title: str = "Index") -> str:
+                          metadata: dict = None) -> str:
         """
         Format index entries as plain text with letter headings
         """
+        if metadata is None:
+            metadata = {'index_name': 'Index', 'books': [], 'custom_properties': []}
+
+        output = []
+
+        # Front page
+        output.append("=" * 60)
+        output.append(metadata['index_name'].center(60))
+        output.append("=" * 60)
+        output.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        output.append("=" * 60)
+        output.append("")
+
+        # Books section
+        if metadata['books']:
+            output.append("Books:")
+            output.append("-" * 60)
+            for book in metadata['books']:
+                page_info = f" ({book['page_count']} pages)" if book['page_count'] else ""
+                output.append(f"  Book {book['book_number']}: {book['book_name']}{page_info}")
+            output.append("")
+
+        # Custom properties section
+        if metadata['custom_properties']:
+            output.append("Properties:")
+            output.append("-" * 60)
+            for prop in metadata['custom_properties']:
+                output.append(f"  {prop['name']}: {prop['value']}")
+            output.append("")
+
+        output.append("=" * 60)
+        output.append("INDEX".center(60))
+        output.append("=" * 60)
+        output.append("")
+
         if not entries:
-            return "Empty index\n"
+            output.append("Empty index")
+            output.append("")
+            output.append("=" * 60)
+            output.append(f"Created with Index it!  •  {metadata['index_name']}".center(60))
+            output.append("=" * 60)
+            return "\n".join(output)
 
         # Sort entries with "#" (special chars/numbers) at the end
         def sort_key(item):
             term = item[0]
             first_letter = self.normalize_first_letter(term)
-            # Put "#" at beginning, otherwise sort alphabetically
             return (first_letter != '#', term.lower())
 
         entries = sorted(entries, key=sort_key)
-
-        output = []
-
-        # Add header
-        output.append("=" * 60)
-        output.append(title.center(60))
-        output.append("=" * 60)
-        output.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        output.append("=" * 60)
-        output.append("")
 
         current_letter = None
 
@@ -132,33 +194,64 @@ class IndexFormatter:
         output.append("=" * 60)
         output.append(f"Total entries: {len(entries)}")
         output.append("=" * 60)
+        output.append("")
+        output.append(f"Created with Index it!  •  {metadata['index_name']}".center(60))
+        output.append("=" * 60)
 
         return "\n".join(output)
 
     def format_markdown(self, entries: List[Tuple[str, List[str]]],
-                        title: str = "Index") -> str:
+                        metadata: dict = None) -> str:
         """
         Format index entries as Markdown
         """
+        if metadata is None:
+            metadata = {'index_name': 'Index', 'books': [], 'custom_properties': []}
+
+        output = []
+
+        # Front page
+        output.append(f"# {metadata['index_name']}")
+        output.append("")
+        output.append(f"*Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
+        output.append("")
+
+        # Books
+        if metadata['books']:
+            output.append("## Books")
+            output.append("")
+            for book in metadata['books']:
+                page_info = f" ({book['page_count']} pages)" if book['page_count'] else ""
+                output.append(f"- **Book {book['book_number']}**: {book['book_name']}{page_info}")
+            output.append("")
+
+        # Custom properties
+        if metadata['custom_properties']:
+            output.append("## Properties")
+            output.append("")
+            for prop in metadata['custom_properties']:
+                output.append(f"- **{prop['name']}**: {prop['value']}")
+            output.append("")
+
+        output.append("---")
+        output.append("")
+        output.append("# Index")
+        output.append("")
+
         if not entries:
-            return "# Index\n\n*Empty index*\n"
+            output.append("*Empty index*")
+            output.append("")
+            output.append("---")
+            output.append(f"*Created with Index it!  •  {metadata['index_name']}*")
+            return "\n".join(output)
 
         # Sort entries with "#" (special chars/numbers) at the end
         def sort_key(item):
             term = item[0]
             first_letter = self.normalize_first_letter(term)
-            # Put "#" at beginning, otherwise sort alphabetically
             return (first_letter != '#', term.lower())
 
         entries = sorted(entries, key=sort_key)
-
-        output = []
-
-        # Add header
-        output.append(f"# {title}")
-        output.append("")
-        output.append(f"*Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
-        output.append("")
 
         current_letter = None
 
@@ -182,24 +275,30 @@ class IndexFormatter:
         output.append("")
         output.append(f"---")
         output.append(f"*Total entries: {len(entries)}*")
+        output.append("")
+        output.append(f"*Created with Index it!  •  {metadata['index_name']}*")
 
         return "\n".join(output)
 
     def format_pdf(self, entries: List[Tuple[str, List[str]]],
-                   output_path: str, title: str = "Index") -> bool:
+                   output_path: str, metadata: dict = None) -> bool:
         """
         Format index entries as a 4-column landscape PDF with continuous flow
         Returns True if successful
         """
+        if metadata is None:
+            metadata = {'index_name': 'Index', 'books': [], 'custom_properties': []}
+
         try:
             from reportlab.lib.pagesizes import letter, landscape
             from reportlab.lib import colors
             from reportlab.lib.units import inch
-            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, KeepTogether, Table, TableStyle
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, KeepTogether, Table, TableStyle, PageBreak, Image, FrameBreak
             from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-            from reportlab.lib.enums import TA_LEFT
+            from reportlab.lib.enums import TA_LEFT, TA_CENTER
             from reportlab.platypus.doctemplate import PageTemplate, BaseDocTemplate
             from reportlab.platypus.frames import Frame
+            import os
 
             if not entries:
                 return False
@@ -213,13 +312,19 @@ class IndexFormatter:
 
             entries = sorted(entries, key=sort_key)
 
-            # Define page number footer function
-            def add_page_number(canvas, doc):
+            # Define page number footer function with index name
+            def add_footer(canvas, doc):
                 canvas.saveState()
                 canvas.setFont('Helvetica', 9)
                 page_num = canvas.getPageNumber()
-                text = f"{page_num}"
-                canvas.drawRightString(landscape(letter)[0] - 0.5 * inch, 0.3 * inch, text)
+
+                # Page number on right
+                canvas.drawRightString(landscape(letter)[0] - 0.5 * inch, 0.3 * inch, str(page_num))
+
+                # Index name and "Created with Index it!" on left
+                footer_text = f"{metadata['index_name']}  •  Created with Index it!"
+                canvas.drawString(0.5 * inch, 0.3 * inch, footer_text)
+
                 canvas.restoreState()
 
             # Create PDF with landscape orientation
@@ -250,19 +355,53 @@ class IndexFormatter:
                 )
                 frames.append(frame)
 
-            # Create page template with 4 columns and page numbers
-            template = PageTemplate(id='FourCol', frames=frames, onPage=add_page_number)
+            # Create page template with 4 columns and footer
+            template = PageTemplate(id='FourCol', frames=frames, onPage=add_footer)
             doc.addPageTemplates([template])
 
             # Styles
             styles = getSampleStyleSheet()
+
+            # Get accent color from metadata (default to pink if not provided)
+            accent_color = metadata.get('color_scheme', '#f2849e')
+
+            # Title style for front page
+            title_style = ParagraphStyle(
+                'TitleStyle',
+                parent=styles['Title'],
+                fontSize=24,
+                textColor=colors.HexColor(accent_color),
+                spaceAfter=12,
+                alignment=TA_CENTER,
+                fontName='Helvetica-Bold'
+            )
+
+            # Front page heading style
+            front_heading_style = ParagraphStyle(
+                'FrontHeadingStyle',
+                parent=styles['Heading2'],
+                fontSize=14,
+                textColor=colors.HexColor(accent_color),
+                spaceAfter=8,
+                spaceBefore=12,
+                fontName='Helvetica-Bold'
+            )
+
+            # Front page content style
+            front_content_style = ParagraphStyle(
+                'FrontContentStyle',
+                parent=styles['Normal'],
+                fontSize=11,
+                spaceAfter=6,
+                leftIndent=20
+            )
 
             # Letter heading style (larger and bold)
             heading_style = ParagraphStyle(
                 'LetterHeading',
                 parent=styles['Heading1'],
                 fontSize=14,
-                textColor=colors.HexColor('#2563eb'),
+                textColor=colors.HexColor(accent_color),
                 spaceAfter=8,
                 spaceBefore=12,
                 fontName='Helvetica-Bold',
@@ -281,6 +420,51 @@ class IndexFormatter:
 
             # Build content as a continuous flow
             story = []
+
+            # Column 1: Logo and title
+            logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'indexit-logo.jpg')
+            if os.path.exists(logo_path):
+                try:
+                    logo = Image(logo_path, width=2.5 * inch, height=2.5 * inch)
+                    logo.hAlign = 'CENTER'
+                    story.append(logo)
+                    story.append(Spacer(1, 0.5 * inch))
+                except:
+                    pass  # Skip logo if there's an error loading it
+
+            # Index name
+            story.append(Paragraph(metadata['index_name'], title_style))
+            story.append(Spacer(1, 0.3 * inch))
+
+            # Generated date
+            story.append(Paragraph(f"<i>Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</i>",
+                                 ParagraphStyle('DateStyle', parent=styles['Normal'], fontSize=10,
+                                              alignment=TA_CENTER, textColor=colors.HexColor('#666666'))))
+
+            # Move to column 2 for Books and Properties
+            story.append(FrameBreak())
+
+            # Column 2-3-4: Books section (can overflow across columns)
+            if metadata['books']:
+                story.append(Paragraph("Books", front_heading_style))
+                for book in metadata['books']:
+                    page_info = f" ({book['page_count']} pages)" if book['page_count'] else ""
+                    story.append(Paragraph(f"<b>Book {book['book_number']}:</b> {self.escape_html(book['book_name'])}{page_info}",
+                                         front_content_style))
+                story.append(Spacer(1, 0.3 * inch))
+
+            # Custom properties section (follows books, can overflow)
+            if metadata['custom_properties']:
+                story.append(Paragraph("Properties", front_heading_style))
+                for prop in metadata['custom_properties']:
+                    story.append(Paragraph(f"<b>{self.escape_html(prop['name'])}:</b> {self.escape_html(prop['value'])}",
+                                         front_content_style))
+                story.append(Spacer(1, 0.3 * inch))
+
+            # Page break before index
+            story.append(PageBreak())
+
+            # Now add index entries
             current_letter = None
 
             for term, references in entries:
@@ -524,6 +708,277 @@ class IndexFormatter:
 
             # Build PDF
             doc.build(story)
+            return True
+
+        except ImportError:
+            return False
+
+    def format_csv(self, entries: List[Tuple[str, List[str]]],
+                   metadata: dict = None) -> str:
+        """
+        Format index entries as CSV
+        """
+        import csv
+        from io import StringIO
+
+        if metadata is None:
+            metadata = {'index_name': 'Index', 'books': [], 'custom_properties': []}
+
+        # Sort entries
+        def sort_key(item):
+            term = item[0]
+            first_letter = self.normalize_first_letter(term)
+            return (first_letter != '#', term.lower())
+
+        entries = sorted(entries, key=sort_key)
+
+        output = StringIO()
+        writer = csv.writer(output)
+
+        # Write header
+        writer.writerow(['Term', 'References'])
+
+        # Write data
+        for term, references in entries:
+            ref_str = ", ".join(references)
+            writer.writerow([term, ref_str])
+
+        return output.getvalue()
+
+    def format_excel(self, entries: List[Tuple[str, List[str]]],
+                     output_path: str, metadata: dict = None) -> bool:
+        """
+        Format index entries as an Excel file
+        Returns True if successful
+        """
+        if metadata is None:
+            metadata = {'index_name': 'Index', 'books': [], 'custom_properties': []}
+
+        try:
+            from openpyxl import Workbook
+            from openpyxl.styles import Font, Alignment, PatternFill
+            from openpyxl.utils import get_column_letter
+
+            if not entries:
+                return False
+
+            # Sort entries
+            def sort_key(item):
+                term = item[0]
+                first_letter = self.normalize_first_letter(term)
+                return (first_letter == '#', term.lower())
+
+            entries = sorted(entries, key=sort_key)
+
+            # Create workbook
+            wb = Workbook()
+
+            # Metadata sheet
+            ws_meta = wb.active
+            ws_meta.title = "Index Info"
+
+            # Add index name
+            ws_meta['A1'] = metadata['index_name']
+            ws_meta['A1'].font = Font(size=16, bold=True)
+            ws_meta['A2'] = f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+
+            # Add books
+            if metadata['books']:
+                row = 4
+                ws_meta[f'A{row}'] = "Books"
+                ws_meta[f'A{row}'].font = Font(size=12, bold=True)
+                row += 1
+                for book in metadata['books']:
+                    page_info = f" ({book['page_count']} pages)" if book['page_count'] else ""
+                    ws_meta[f'A{row}'] = f"Book {book['book_number']}: {book['book_name']}{page_info}"
+                    row += 1
+                row += 1
+
+            # Add custom properties
+            if metadata['custom_properties']:
+                if not metadata['books']:
+                    row = 4
+                ws_meta[f'A{row}'] = "Properties"
+                ws_meta[f'A{row}'].font = Font(size=12, bold=True)
+                row += 1
+                for prop in metadata['custom_properties']:
+                    ws_meta[f'A{row}'] = f"{prop['name']}: {prop['value']}"
+                    row += 1
+
+            # Adjust column width
+            ws_meta.column_dimensions['A'].width = 60
+
+            # Index entries sheet
+            ws = wb.create_sheet("Index")
+
+            # Headers
+            ws['A1'] = "Term"
+            ws['B1'] = "References"
+            ws['A1'].font = Font(bold=True)
+            ws['B1'].font = Font(bold=True)
+            ws['A1'].fill = PatternFill(start_color="E2E8F0", end_color="E2E8F0", fill_type="solid")
+            ws['B1'].fill = PatternFill(start_color="E2E8F0", end_color="E2E8F0", fill_type="solid")
+
+            # Add entries
+            row = 2
+            current_letter = None
+
+            for term, references in entries:
+                first_letter = self.normalize_first_letter(term)
+
+                # Add letter heading
+                if first_letter != current_letter:
+                    ws[f'A{row}'] = first_letter
+                    ws[f'A{row}'].font = Font(size=14, bold=True)
+                    ws[f'A{row}'].fill = PatternFill(start_color="F1F5F9", end_color="F1F5F9", fill_type="solid")
+                    ws.merge_cells(f'A{row}:B{row}')
+                    row += 1
+                    current_letter = first_letter
+
+                # Add entry
+                ws[f'A{row}'] = term
+                ws[f'B{row}'] = ", ".join(references)
+                row += 1
+
+            # Adjust column widths
+            ws.column_dimensions['A'].width = 40
+            ws.column_dimensions['B'].width = 60
+
+            # Save workbook
+            wb.save(output_path)
+            return True
+
+        except ImportError:
+            return False
+
+    def format_notes_latex(self, notes: List[Tuple[str, str]]) -> str:
+        """
+        Format notes as LaTeX
+        """
+        if not notes:
+            return "% Empty notes\n"
+
+        # Sort notes
+        def sort_key(item):
+            term = item[0]
+            first_letter = self.normalize_first_letter(term)
+            return (first_letter != '#', term.lower())
+
+        notes = sorted(notes, key=sort_key)
+
+        output = []
+
+        # Header
+        output.append("% Notes")
+        output.append(f"% Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        output.append("")
+        output.append("\\documentclass{article}")
+        output.append("\\usepackage[utf8]{inputenc}")
+        output.append("\\title{Notes}")
+        output.append("\\date{" + datetime.now().strftime('%Y-%m-%d') + "}")
+        output.append("")
+        output.append("\\begin{document}")
+        output.append("\\maketitle")
+        output.append("")
+
+        for term, note in notes:
+            output.append(f"\\section*{{{self.escape_latex(term)}}}")
+            output.append("")
+            # Escape note content and preserve line breaks
+            escaped_note = self.escape_latex(note)
+            # Replace double newlines with paragraph breaks
+            escaped_note = escaped_note.replace('\n\n', '\n\n\\par\n')
+            output.append(escaped_note)
+            output.append("")
+
+        output.append("\\end{document}")
+
+        return "\n".join(output)
+
+    def format_notes_markdown(self, notes: List[Tuple[str, str]]) -> str:
+        """
+        Format notes as Markdown
+        """
+        if not notes:
+            return "*Empty notes*\n"
+
+        # Sort notes
+        def sort_key(item):
+            term = item[0]
+            first_letter = self.normalize_first_letter(term)
+            return (first_letter != '#', term.lower())
+
+        notes = sorted(notes, key=sort_key)
+
+        output = []
+
+        # Header
+        output.append("# Notes")
+        output.append("")
+        output.append(f"*Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
+        output.append("")
+        output.append("---")
+        output.append("")
+
+        for term, note in notes:
+            output.append(f"## {term}")
+            output.append("")
+            output.append(note)
+            output.append("")
+
+        output.append("---")
+        output.append(f"*Total notes: {len(notes)}*")
+
+        return "\n".join(output)
+
+    def format_notes_excel(self, notes: List[Tuple[str, str]], output_path: str) -> bool:
+        """
+        Format notes as an Excel file
+        Returns True if successful
+        """
+        try:
+            from openpyxl import Workbook
+            from openpyxl.styles import Font, Alignment, PatternFill
+            from openpyxl.utils import get_column_letter
+
+            if not notes:
+                return False
+
+            # Sort notes
+            def sort_key(item):
+                term = item[0]
+                first_letter = self.normalize_first_letter(term)
+                return (first_letter == '#', term.lower())
+
+            notes = sorted(notes, key=sort_key)
+
+            # Create workbook
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Notes"
+
+            # Headers
+            ws['A1'] = "Term"
+            ws['B1'] = "Notes"
+            ws['A1'].font = Font(bold=True)
+            ws['B1'].font = Font(bold=True)
+            ws['A1'].fill = PatternFill(start_color="E2E8F0", end_color="E2E8F0", fill_type="solid")
+            ws['B1'].fill = PatternFill(start_color="E2E8F0", end_color="E2E8F0", fill_type="solid")
+
+            # Add notes
+            row = 2
+            for term, note in notes:
+                ws[f'A{row}'] = term
+                ws[f'B{row}'] = note
+                ws[f'B{row}'].alignment = Alignment(wrap_text=True, vertical='top')
+                row += 1
+
+            # Adjust column widths
+            ws.column_dimensions['A'].width = 30
+            ws.column_dimensions['B'].width = 80
+
+            # Save workbook
+            wb.save(output_path)
             return True
 
         except ImportError:

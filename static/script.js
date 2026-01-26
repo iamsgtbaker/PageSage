@@ -5,12 +5,13 @@ let allNotes = [];
 let searchTimeout = null;
 let notesSearchTimeout = null;
 let selectedLetter = null;
+let selectedNotesLetter = null;
 let currentSearchQuery = '';
 let autocompleteIndex = -1;
 let lastUsedBook = '';
 let selectedBookFilter = '';
 let recentEntriesOffset = 0;
-let recentEntriesLimit = 5;
+let recentEntriesLimit = 10;
 let allRecentEntries = [];
 
 // Helper function to normalize first letter
@@ -30,17 +31,22 @@ function normalizeFirstLetter(text) {
 }
 
 // Rotating tagline functionality
-const taglines = [
-    "Build your exam reference, fast",
-    "Your open-book advantage",
-    "Find it when it counts",
-    "Never flip through 800 pages again", 
-    "Study smarter, not harder",
-    "From chaos to clarity",
-    "Ace your open-book exams",
-    "Your personal exam navigator"
-];
+let taglines = ["Build your exam reference, fast"];
 let currentTaglineIndex = 0;
+
+async function loadTaglines() {
+    try {
+        const response = await fetch('/static/config.json');
+        if (response.ok) {
+            const config = await response.json();
+            if (config.taglines && config.taglines.length > 0) {
+                taglines = config.taglines;
+            }
+        }
+    } catch (error) {
+        console.error('Failed to load taglines config:', error);
+    }
+}
 
 function startTaglineRotation() {
     setInterval(() => {
@@ -53,7 +59,7 @@ function startTaglineRotation() {
                 taglineElement.style.opacity = '1';
             }, 300);
         }
-    }, 4000); // Rotate every 4 seconds
+    }, 4000);
 }
 
 // Hamburger Menu Control
@@ -112,6 +118,14 @@ function closeHelpModal() {
     document.getElementById('helpModal').classList.remove('show');
 }
 
+function showCsvHelpModal() {
+    document.getElementById('csvHelpModal').classList.add('show');
+}
+
+function closeCsvHelpModal() {
+    document.getElementById('csvHelpModal').classList.remove('show');
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     loadEntries();
@@ -126,6 +140,36 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('editNotesForm').addEventListener('submit', handleEditNotes);
     document.getElementById('editBookForm').addEventListener('submit', handleEditBook);
     document.getElementById('addBookModalForm').addEventListener('submit', handleAddBookModal);
+
+    // Database management forms
+    const importDbForm = document.getElementById('importDatabaseForm');
+    if (importDbForm) {
+        importDbForm.addEventListener('submit', importDatabase);
+    }
+
+    const createDbForm = document.getElementById('createDatabaseForm');
+    if (createDbForm) {
+        createDbForm.addEventListener('submit', createNewDatabase);
+    }
+
+    // Get Started form
+    const getStartedForm = document.getElementById('getStartedForm');
+    if (getStartedForm) {
+        getStartedForm.addEventListener('submit', handleGetStarted);
+    }
+
+    // Check if this is a new database that needs setup
+    checkNeedsSetup();
+
+    // Close database switcher when clicking outside
+    document.addEventListener('click', function(event) {
+        const switcher = document.getElementById('databaseSwitcher');
+        const indexName = document.getElementById('indexName');
+
+        if (switcher && indexName && !switcher.contains(event.target) && event.target !== indexName) {
+            switcher.style.display = 'none';
+        }
+    });
 
     // Setup search
     document.getElementById('searchInput').addEventListener('input', handleSearch);
@@ -239,8 +283,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Setup global keyboard shortcuts
     document.addEventListener('keydown', handleGlobalKeyboardShortcuts);
 
-    // Start rotating tagline
-    startTaglineRotation();
+    // Load taglines from config and start rotating
+    loadTaglines().then(() => startTaglineRotation());
 });
 
 // Switch tabs
@@ -291,19 +335,6 @@ function switchTab(tabName) {
 }
 
 // Toggle recent entries section
-function toggleRecentEntries() {
-    const container = document.getElementById('recentEntriesContainer');
-    const toggle = document.getElementById('recentEntriesToggle');
-
-    if (container.classList.contains('collapsed')) {
-        container.classList.remove('collapsed');
-        toggle.textContent = '▼';
-    } else {
-        container.classList.add('collapsed');
-        toggle.textContent = '▶';
-    }
-}
-
 // Toggle tools section with accordion behavior
 function toggleToolsSection(section) {
     const sections = ['import', 'export', 'gaps'];
@@ -335,19 +366,6 @@ function toggleToolsSection(section) {
 }
 
 // Toggle CSV format help
-function toggleCsvFormat() {
-    const container = document.getElementById('csvFormatHelp');
-    const toggle = document.getElementById('csvFormatToggle');
-
-    if (container.classList.contains('collapsed')) {
-        container.classList.remove('collapsed');
-        toggle.textContent = '▼';
-    } else {
-        container.classList.add('collapsed');
-        toggle.textContent = '▶';
-    }
-}
-
 // Export index from dropdown
 function exportIndexFromDropdown() {
     const format = document.getElementById('indexExportFormat').value;
@@ -398,15 +416,14 @@ function displayRecentEntries() {
     // Get entries to display (offset to offset + limit)
     const entriesToShow = allRecentEntries.slice(0, recentEntriesOffset + recentEntriesLimit);
 
-    let html = '';
-    entriesToShow.forEach(entry => {
-        html += `<div class="recent-entry-item">`;
-        html += `<div class="recent-entry-term">${escapeHtml(entry.term)}</div>`;
-        html += `<div class="recent-entry-ref" onclick="editEntry('${escapeHtml(entry.term)}', '${escapeHtml(entry.reference)}')">${escapeHtml(entry.reference)}</div>`;
-        html += `</div>`;
+    // Create comma-separated list of clickable terms
+    const termLinks = entriesToShow.map(entry => {
+        const escapedTerm = escapeHtml(entry.term);
+        const escapedRef = escapeHtml(entry.reference);
+        return `<a href="#" class="recent-term-link" onclick="editEntry('${escapedTerm}', '${escapedRef}'); return false;">${escapedTerm}</a>`;
     });
 
-    container.innerHTML = html;
+    container.innerHTML = `<div class="recent-terms-comma-list">${termLinks.join(', ')}</div>`;
 
     // Show or hide the "Show More" button
     if (showMoreBtn) {
@@ -697,6 +714,7 @@ async function loadNotes() {
         const response = await fetch('/api/notes');
         const data = await response.json();
         allNotes = data.notes;
+        buildNotesLetterNavigation();
         displayNotes(allNotes);
     } catch (error) {
         showMessage('Error loading notes: ' + error.message, 'error');
@@ -705,30 +723,68 @@ async function loadNotes() {
 
 // Refresh notes
 function refreshNotes() {
-    loadNotes();
     document.getElementById('notesSearchInput').value = '';
+    selectedNotesLetter = null;
+    loadNotes();
 }
 
 // Display notes
 function displayNotes(notes) {
     const container = document.getElementById('notesList');
 
-    if (notes.length === 0) {
+    // Apply letter filter
+    let filteredNotes = notes;
+    if (selectedNotesLetter) {
+        filteredNotes = filteredNotes.filter(note => {
+            const firstLetter = normalizeFirstLetter(note.term);
+            return firstLetter === selectedNotesLetter;
+        });
+    }
+
+    if (filteredNotes.length === 0) {
         container.innerHTML = '<p class="empty-state">No notes found</p>';
         updateNotesStats(0);
         return;
     }
 
+    // Group by first letter
+    const grouped = {};
+    filteredNotes.forEach(note => {
+        const letter = normalizeFirstLetter(note.term);
+        if (!grouped[letter]) {
+            grouped[letter] = [];
+        }
+        grouped[letter].push(note);
+    });
+
+    // Sort letters, but put "#" at the beginning
+    const letters = Object.keys(grouped).sort((a, b) => {
+        if (a === '#') return -1;
+        if (b === '#') return 1;
+        return a.localeCompare(b);
+    });
+
+    // Build HTML with letter headers
     let html = '';
-    notes.forEach(note => {
-        html += `<div class="note-item" onclick="editNotes('${escapeHtml(note.term)}', '${escapeHtml(note.notes)}')">`;
-        html += `<div class="note-term">${escapeHtml(note.term)}</div>`;
-        html += `<div class="note-text">${escapeHtml(note.notes)}</div>`;
+    let totalShown = 0;
+
+    letters.forEach(letter => {
+        html += `<div class="letter-group">`;
+        html += `<div class="letter-heading">${letter}</div>`;
+
+        grouped[letter].forEach(note => {
+            totalShown++;
+            html += `<div class="note-item" onclick="editNotes('${escapeHtml(note.term)}', '${escapeHtml(note.notes)}')">`;
+            html += `<div class="note-term">${escapeHtml(note.term)}</div>`;
+            html += `<div class="note-text">${escapeHtml(note.notes)}</div>`;
+            html += `</div>`;
+        });
+
         html += `</div>`;
     });
 
     container.innerHTML = html;
-    updateNotesStats(notes.length);
+    updateNotesStats(totalShown);
 }
 
 // Update notes statistics
@@ -757,7 +813,62 @@ function handleNotesSearch(e) {
             );
             displayNotes(filtered);
         }
+        buildNotesLetterNavigation();
     }, 300);
+}
+
+// Build notes letter navigation
+function buildNotesLetterNavigation() {
+    const navContainer = document.getElementById('notesLetterNav');
+
+    if (!navContainer) return;
+
+    // Apply search if present
+    let notesToNavigate = allNotes;
+    const searchQuery = document.getElementById('notesSearchInput').value.trim();
+
+    if (searchQuery) {
+        notesToNavigate = allNotes.filter(note =>
+            note.term.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            note.notes.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+    }
+
+    // Get all unique first letters from notes
+    const letters = new Set();
+    notesToNavigate.forEach(note => {
+        letters.add(normalizeFirstLetter(note.term));
+    });
+
+    // Sort letters, but put "#" at the beginning
+    const sortedLetters = Array.from(letters).sort((a, b) => {
+        if (a === '#') return -1;
+        if (b === '#') return 1;
+        return a.localeCompare(b);
+    });
+
+    // Build navigation HTML
+    let html = '';
+    sortedLetters.forEach(letter => {
+        const activeClass = letter === selectedNotesLetter ? 'active' : '';
+        html += `<button class="letter-nav-btn ${activeClass}" onclick="filterNotesByLetter('${letter}')">${letter}</button>`;
+    });
+
+    navContainer.innerHTML = html;
+}
+
+// Filter notes by letter
+function filterNotesByLetter(letter) {
+    // Toggle: if clicking the already-selected letter, deselect it to show all
+    if (selectedNotesLetter === letter) {
+        selectedNotesLetter = null;
+    } else {
+        selectedNotesLetter = letter;
+    }
+
+    document.getElementById('notesSearchInput').value = '';
+    buildNotesLetterNavigation();
+    displayNotes(allNotes);
 }
 
 // Open edit notes modal
@@ -1256,6 +1367,11 @@ async function loadSettings() {
         if (data.index_name) {
             document.getElementById('indexName').textContent = data.index_name;
         }
+
+        // Apply saved color scheme
+        if (data.color_scheme) {
+            applyColorScheme(data.color_scheme);
+        }
     } catch (error) {
         console.error('Error loading settings:', error);
     }
@@ -1267,38 +1383,53 @@ async function loadSettingsTab() {
         const response = await fetch('/api/settings');
         const data = await response.json();
         document.getElementById('settingsIndexName').value = data.index_name || '';
-        document.getElementById('settingsIndexYear').value = data.index_year || '';
-        document.getElementById('settingsIndexVersion').value = data.index_version || '';
+
+        // Set color scheme dropdown
+        const colorSelect = document.getElementById('colorScheme');
+        if (colorSelect && data.color_scheme) {
+            colorSelect.value = data.color_scheme;
+            updateColorSelectBackground(data.color_scheme);
+        }
+
+        // Load custom properties
+        loadCustomProperties();
     } catch (error) {
         console.error('Error loading settings:', error);
     }
 }
 
-// Save index settings
-async function saveIndexSettings() {
+// Save all settings (index name and optionally add new property)
+async function saveAllSettings() {
     const name = document.getElementById('settingsIndexName').value.trim();
-    const year = document.getElementById('settingsIndexYear').value.trim();
-    const version = document.getElementById('settingsIndexVersion').value.trim();
 
     if (!name) {
-        showSettingsMessage('indexSettingsMessage', 'Please enter a name', 'error');
+        showSettingsMessage('indexSettingsMessage', 'Please enter an index name', 'error');
         return;
     }
 
+    // Save index name
     try {
         const response = await fetch('/api/settings/index-name', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ name, year, version })
+            body: JSON.stringify({ name })
         });
 
         const data = await response.json();
 
         if (response.ok) {
-            showSettingsMessage('indexSettingsMessage', data.message, 'success');
+            showSettingsMessage('indexSettingsMessage', 'Settings saved', 'success');
             loadSettings();
+
+            // Check if user is adding a new custom property
+            const propertyName = document.getElementById('propertyName').value.trim();
+            const propertyValue = document.getElementById('propertyValue').value.trim();
+
+            if (propertyName && propertyValue) {
+                await addNewCustomProperty(propertyName, propertyValue);
+            }
         } else {
             showSettingsMessage('indexSettingsMessage', data.error || 'Failed to save settings', 'error');
         }
@@ -1307,18 +1438,154 @@ async function saveIndexSettings() {
     }
 }
 
+// Add new custom property
+async function addNewCustomProperty(propertyName, propertyValue) {
+    try {
+        const response = await fetch('/api/custom-properties', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                property_name: propertyName,
+                property_value: propertyValue
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            document.getElementById('propertyName').value = '';
+            document.getElementById('propertyValue').value = '';
+            loadCustomProperties();
+        } else {
+            showSettingsMessage('indexSettingsMessage', data.error || 'Failed to add property', 'error');
+        }
+    } catch (error) {
+        showSettingsMessage('indexSettingsMessage', 'Error: ' + error.message, 'error');
+    }
+}
+
+// Change color scheme
+async function changeColorScheme() {
+    const colorSelect = document.getElementById('colorScheme');
+    const color = colorSelect.value;
+
+    try {
+        const response = await fetch('/api/settings/color-scheme', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ color })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            applyColorScheme(color);
+            updateColorSelectBackground(color);
+            showSettingsMessage('colorSchemeMessage', 'Color scheme updated', 'success');
+            setTimeout(() => {
+                document.getElementById('colorSchemeMessage').innerHTML = '';
+            }, 2000);
+        } else {
+            showSettingsMessage('colorSchemeMessage', data.error || 'Failed to save color scheme', 'error');
+        }
+    } catch (error) {
+        showSettingsMessage('colorSchemeMessage', 'Error: ' + error.message, 'error');
+    }
+}
+
+// Apply color scheme to the page
+function applyColorScheme(color) {
+    document.documentElement.style.setProperty('--secondary-color', color);
+
+    // Convert hex to rgba for message background
+    const rgb = hexToRgb(color);
+    if (rgb) {
+        const messageSuccessBg = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.15)`;
+        document.documentElement.style.setProperty('--message-success-bg', messageSuccessBg);
+    }
+
+    const colorSelect = document.getElementById('colorScheme');
+    if (colorSelect) {
+        colorSelect.value = color;
+        updateColorSelectBackground(color);
+    }
+
+    // Update hamburger menu hover color
+    updateHamburgerMenuColor(color);
+}
+
+// Helper function to convert hex to rgb
+function hexToRgb(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+    } : null;
+}
+
+// Update color select background to match selected color
+function updateColorSelectBackground(color) {
+    const colorSelect = document.getElementById('colorScheme');
+    if (colorSelect) {
+        colorSelect.style.backgroundColor = color;
+    }
+}
+
+// Update hamburger menu hover color
+function updateHamburgerMenuColor(color) {
+    // Remove '#' from color and URL-encode it for SVG
+    const colorEncoded = encodeURIComponent(color);
+
+    // Create SVG data URI with the new color
+    const svgDataUri = `url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cstyle%3Eline %7B stroke-width: 8px%3B stroke: ${colorEncoded}%3B %7D%3C/style%3E%3Cline x1='0' y1='25' x2='100' y2='25' /%3E%3Cline x1='0' y1='50' x2='100' y2='50' /%3E%3Cline x1='0' y1='75' x2='100' y2='75' /%3E%3C/svg%3E")`;
+
+    // Update CSS custom property for hamburger menu
+    document.documentElement.style.setProperty('--hamburger-hover-icon', svgDataUri);
+}
+
 // Backup database
 function backupDatabase() {
     window.location.href = '/api/settings/backup';
     // Don't show message as the file download will indicate success
 }
 
+// Execute index management action from dropdown
+function executeIndexManagementAction() {
+    const action = document.getElementById('indexManagementAction').value;
+
+    switch (action) {
+        case 'create':
+            showCreateDatabaseModal();
+            break;
+        case 'backup':
+            backupDatabase();
+            break;
+        case 'import':
+            showImportDatabaseModal();
+            break;
+        case 'archive':
+            archiveCurrentDatabase();
+            break;
+        default:
+            // No action selected
+            break;
+    }
+
+    // Reset dropdown after action
+    document.getElementById('indexManagementAction').value = '';
+}
+
 // Create new index (clear all data)
-async function createNewIndex() {
+async function archiveCurrentDatabase() {
     const confirmed = confirm(
-        'WARNING: This will permanently delete ALL entries and notes!\n\n' +
-        'Are you sure you want to create a new index?\n\n' +
-        'Consider backing up your database first.'
+        'This will archive the current database and move it to the archive folder.\n\n' +
+        'The database will no longer appear in the index switcher.\n\n' +
+        'Are you sure you want to archive this database?'
     );
 
     if (!confirmed) {
@@ -1326,7 +1593,7 @@ async function createNewIndex() {
     }
 
     try {
-        const response = await fetch('/api/settings/clear', {
+        const response = await fetch('/api/databases/archive', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1336,12 +1603,14 @@ async function createNewIndex() {
         const data = await response.json();
 
         if (response.ok) {
-            showMessage(data.message, 'success');
-            // Reload entries and notes
-            loadEntries();
-            loadNotes();
+            showColorSchemeMessage(
+                data.message + (data.switched_to ? ` Switched to ${data.switched_to}` : ''),
+                'success'
+            );
+            // Reload page to show new database
+            setTimeout(() => window.location.reload(), 1500);
         } else {
-            showMessage(data.error || 'Failed to clear data', 'error');
+            showMessage(data.error || 'Failed to archive database', 'error');
         }
     } catch (error) {
         showMessage('Error: ' + error.message, 'error');
@@ -1362,6 +1631,227 @@ function showSettingsMessage(messageId, text, type = 'success') {
     setTimeout(() => {
         messageDiv.classList.remove('show');
     }, 5000);
+}
+
+// Custom Properties Management
+let draggedPropertyElement = null;
+let allCustomProperties = [];
+
+// Load custom properties
+async function loadCustomProperties() {
+    try {
+        const response = await fetch('/api/custom-properties');
+        const data = await response.json();
+        allCustomProperties = data.properties;
+        displayCustomProperties(allCustomProperties);
+    } catch (error) {
+        console.error('Error loading custom properties:', error);
+    }
+}
+
+// Display custom properties
+function displayCustomProperties(properties) {
+    const container = document.getElementById('customPropertiesTable');
+
+    if (properties.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    let html = '';
+    properties.forEach(prop => {
+        html += `<div class="property-row" draggable="true" data-property-id="${prop.id}">`;
+        html += `<span class="drag-handle">☰</span>`;
+        html += `<div class="property-row-content" onclick="openEditPropertyModal(${prop.id})">`;
+        html += `<div class="property-name">${escapeHtml(prop.property_name)}</div>`;
+        html += `<div class="property-value">${escapeHtml(prop.property_value)}</div>`;
+        html += `</div>`;
+        html += `</div>`;
+    });
+
+    container.innerHTML = html;
+
+    // Add drag and drop event listeners
+    const propertyRows = container.querySelectorAll('.property-row');
+    propertyRows.forEach(row => {
+        row.addEventListener('dragstart', handleDragStart);
+        row.addEventListener('dragend', handleDragEnd);
+        row.addEventListener('dragover', handleDragOver);
+        row.addEventListener('drop', handleDrop);
+        row.addEventListener('dragenter', handleDragEnter);
+        row.addEventListener('dragleave', handleDragLeave);
+    });
+}
+
+// Open edit property modal
+function openEditPropertyModal(propertyId) {
+    const property = allCustomProperties.find(p => p.id === propertyId);
+    if (property) {
+        document.getElementById('editPropertyModalId').value = property.id;
+        document.getElementById('editPropertyModalName').value = property.property_name;
+        document.getElementById('editPropertyModalValue').value = property.property_value;
+        document.getElementById('editPropertyModal').classList.add('show');
+    }
+}
+
+// Close edit property modal
+function closeEditPropertyModal() {
+    document.getElementById('editPropertyModal').classList.remove('show');
+    document.getElementById('editPropertyForm').reset();
+}
+
+// Save edited property from modal
+async function saveEditedProperty(event) {
+    event.preventDefault();
+
+    const propertyId = document.getElementById('editPropertyModalId').value;
+    const propertyName = document.getElementById('editPropertyModalName').value.trim();
+    const propertyValue = document.getElementById('editPropertyModalValue').value.trim();
+
+    if (!propertyName || !propertyValue) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/custom-properties/${propertyId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                property_name: propertyName,
+                property_value: propertyValue
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            closeEditPropertyModal();
+            loadCustomProperties();
+            showSettingsMessage('indexSettingsMessage', 'Property updated', 'success');
+        } else {
+            alert(data.error || 'Failed to save property');
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+}
+
+// Delete property from modal
+async function deletePropertyFromModal() {
+    const propertyId = document.getElementById('editPropertyModalId').value;
+
+    if (!confirm('Are you sure you want to delete this property?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/custom-properties/${propertyId}`, {
+            method: 'DELETE'
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            closeEditPropertyModal();
+            loadCustomProperties();
+            showSettingsMessage('indexSettingsMessage', 'Property deleted', 'success');
+        } else {
+            alert(data.error || 'Failed to delete property');
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+}
+
+// Drag and drop handlers
+function handleDragStart(e) {
+    draggedPropertyElement = this;
+    this.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', this.innerHTML);
+}
+
+function handleDragEnd(e) {
+    this.classList.remove('dragging');
+
+    // Remove drag-over class from all rows
+    document.querySelectorAll('.property-row').forEach(row => {
+        row.classList.remove('drag-over');
+    });
+}
+
+function handleDragOver(e) {
+    if (e.preventDefault) {
+        e.preventDefault();
+    }
+    e.dataTransfer.dropEffect = 'move';
+    return false;
+}
+
+function handleDragEnter(e) {
+    if (this !== draggedPropertyElement) {
+        this.classList.add('drag-over');
+    }
+}
+
+function handleDragLeave(e) {
+    this.classList.remove('drag-over');
+}
+
+function handleDrop(e) {
+    if (e.stopPropagation) {
+        e.stopPropagation();
+    }
+
+    if (draggedPropertyElement !== this) {
+        // Get all property rows
+        const container = document.getElementById('customPropertiesTable');
+        const rows = Array.from(container.querySelectorAll('.property-row'));
+
+        // Remove dragged element from its current position
+        const draggedIndex = rows.indexOf(draggedPropertyElement);
+        const targetIndex = rows.indexOf(this);
+
+        // Reorder in DOM
+        if (draggedIndex < targetIndex) {
+            this.parentNode.insertBefore(draggedPropertyElement, this.nextSibling);
+        } else {
+            this.parentNode.insertBefore(draggedPropertyElement, this);
+        }
+
+        // Get new order of property IDs
+        const newOrder = Array.from(container.querySelectorAll('.property-row'))
+            .map(row => parseInt(row.getAttribute('data-property-id')));
+
+        // Save new order to server
+        savePropertyOrder(newOrder);
+    }
+
+    return false;
+}
+
+// Save property order to server
+async function savePropertyOrder(propertyIds) {
+    try {
+        const response = await fetch('/api/custom-properties/reorder', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                property_ids: propertyIds
+            })
+        });
+
+        if (!response.ok) {
+            const data = await response.json();
+            console.error('Failed to save property order:', data.error);
+        }
+    } catch (error) {
+        console.error('Error saving property order:', error);
+    }
 }
 
 // Load book dropdowns
@@ -2239,5 +2729,294 @@ async function confirmReinclude() {
         }
     } catch (error) {
         showMessage('Error: ' + error.message, 'error');
+    }
+}
+
+
+// ===================================
+// Database Management Functions
+// ===================================
+
+// Show/hide database switcher dropdown
+async function showDatabaseSwitcher() {
+    const switcher = document.getElementById('databaseSwitcher');
+
+    if (switcher.style.display === 'block') {
+        switcher.style.display = 'none';
+        return;
+    }
+
+    try {
+        // Fetch available databases
+        const response = await fetch('/api/databases/list');
+        const data = await response.json();
+
+        // Build dropdown list
+        const listDiv = switcher.querySelector('.database-list');
+        listDiv.innerHTML = '<h3>Switch Index</h3>';
+
+        if (data.databases.length === 0) {
+            listDiv.innerHTML += '<p>No databases found</p>';
+        } else {
+            const ul = document.createElement('ul');
+
+            data.databases.forEach(db => {
+                const li = document.createElement('li');
+                const isActive = db.db_name === data.active;
+                li.innerHTML = `<a href="#" onclick="switchDatabase('${db.db_name}'); return false;">
+                    ${isActive ? '✓ ' : ''}${db.index_name}
+                </a>`;
+                if (isActive) {
+                    li.classList.add('active');
+                }
+                ul.appendChild(li);
+            });
+
+            listDiv.appendChild(ul);
+        }
+
+        switcher.style.display = 'block';
+    } catch (error) {
+        console.error('Error loading databases:', error);
+        showMessage('Error loading databases', 'error');
+    }
+}
+
+// Switch to a different database
+async function switchDatabase(dbName) {
+    try {
+        const response = await fetch('/api/databases/switch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ db_name: dbName })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showColorSchemeMessage(`Switched to ${data.index_name}`, 'success');
+            document.getElementById('databaseSwitcher').style.display = 'none';
+
+            // Reload the page to refresh all data
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            showColorSchemeMessage(data.error || 'Failed to switch database', 'error');
+        }
+    } catch (error) {
+        console.error('Error switching database:', error);
+        showColorSchemeMessage('Error switching database', 'error');
+    }
+}
+
+// Import database
+async function importDatabase(event) {
+    event.preventDefault();
+
+    const form = document.getElementById('importDatabaseForm');
+    const formData = new FormData(form);
+    const messageDiv = document.getElementById('importDatabaseMessage');
+
+    try {
+        const response = await fetch('/api/databases/import', {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            messageDiv.innerHTML = `<div class="success">${data.message}</div>`;
+
+            // Switch to the newly imported database
+            setTimeout(() => {
+                switchDatabase(data.db_name);
+            }, 1000);
+        } else {
+            messageDiv.innerHTML = `<div class="error">${data.error}</div>`;
+        }
+    } catch (error) {
+        console.error('Error importing database:', error);
+        messageDiv.innerHTML = `<div class="error">Error importing database</div>`;
+    }
+}
+
+// Create new database
+async function createNewDatabase(event) {
+    event.preventDefault();
+
+    const indexName = document.getElementById('newDatabaseName').value;
+    const messageDiv = document.getElementById('createDatabaseMessage');
+
+    try {
+        const response = await fetch('/api/databases/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ index_name: indexName })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            messageDiv.innerHTML = `<div class="success">${data.message}</div>`;
+
+            // Switch to the newly created database
+            setTimeout(() => {
+                switchDatabase(data.db_name);
+            }, 1000);
+        } else {
+            messageDiv.innerHTML = `<div class="error">${data.error}</div>`;
+        }
+    } catch (error) {
+        console.error('Error creating database:', error);
+        messageDiv.innerHTML = `<div class="error">Error creating database</div>`;
+    }
+}
+
+// Show import database modal
+function showImportDatabaseModal() {
+    document.getElementById('importDatabaseModal').classList.add('show');
+}
+
+// Close import database modal
+function closeImportDatabaseModal() {
+    document.getElementById('importDatabaseModal').classList.remove('show');
+    document.getElementById('importDatabaseForm').reset();
+    document.getElementById('importDatabaseMessage').innerHTML = '';
+}
+
+// Show create database modal
+function showCreateDatabaseModal() {
+    document.getElementById('createDatabaseModal').classList.add('show');
+}
+
+// Close create database modal
+function closeCreateDatabaseModal() {
+    document.getElementById('createDatabaseModal').classList.remove('show');
+    document.getElementById('createDatabaseForm').reset();
+    document.getElementById('createDatabaseMessage').innerHTML = '';
+}
+
+// ===================================
+// Get Started Modal Functions
+// ===================================
+
+// Check if this is a new/empty database that needs setup
+async function checkNeedsSetup() {
+    try {
+        // Check settings, books, and entries to determine if setup is needed
+        const [settingsRes, booksRes, entriesRes] = await Promise.all([
+            fetch('/api/settings'),
+            fetch('/api/books'),
+            fetch('/api/entries')
+        ]);
+
+        const settings = await settingsRes.json();
+        const books = await booksRes.json();
+        const entries = await entriesRes.json();
+
+        // Show Get Started modal if:
+        // - Index name is the default "Book Index" AND
+        // - No books have been added AND
+        // - No entries have been added
+        const isDefaultName = !settings.index_name || settings.index_name === 'Book Index';
+        const hasNoBooks = !books.books || books.books.length === 0;
+        const hasNoEntries = !entries.entries || entries.entries.length === 0;
+
+        if (isDefaultName && hasNoBooks && hasNoEntries) {
+            showGetStartedModal();
+        }
+    } catch (error) {
+        console.error('Error checking setup status:', error);
+    }
+}
+
+// Show Get Started modal
+function showGetStartedModal() {
+    document.getElementById('getStartedModal').classList.add('show');
+}
+
+// Close Get Started modal
+function closeGetStartedModal() {
+    document.getElementById('getStartedModal').classList.remove('show');
+    document.getElementById('getStartedForm').reset();
+    document.getElementById('getStartedMessage').innerHTML = '';
+}
+
+// Handle Get Started form submission
+async function handleGetStarted(event) {
+    event.preventDefault();
+
+    const indexName = document.getElementById('getStartedIndexName').value.trim();
+    const bookNumber = document.getElementById('getStartedBookNumber').value.trim();
+    const bookName = document.getElementById('getStartedBookName').value.trim();
+    const bookPages = document.getElementById('getStartedBookPages').value.trim();
+    const messageDiv = document.getElementById('getStartedMessage');
+
+    if (!indexName || !bookNumber || !bookName) {
+        messageDiv.className = 'message error show';
+        messageDiv.textContent = 'Please fill in all required fields';
+        return;
+    }
+
+    try {
+        // Update the index name
+        const settingsResponse = await fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ index_name: indexName })
+        });
+
+        if (!settingsResponse.ok) {
+            const settingsData = await settingsResponse.json();
+            messageDiv.className = 'message error show';
+            messageDiv.textContent = settingsData.error || 'Failed to save index name';
+            return;
+        }
+
+        // Add the first book
+        const bookResponse = await fetch('/api/books', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                book_number: bookNumber,
+                book_name: bookName,
+                page_count: bookPages ? parseInt(bookPages) : 0
+            })
+        });
+
+        if (!bookResponse.ok) {
+            const bookData = await bookResponse.json();
+            messageDiv.className = 'message warning show';
+            messageDiv.textContent = 'Index name saved but failed to add book: ' + (bookData.error || 'Unknown error');
+            return;
+        }
+
+        // Success - close modal and reload
+        messageDiv.className = 'message success show';
+        messageDiv.textContent = 'Setup complete!';
+
+        setTimeout(() => {
+            closeGetStartedModal();
+            // Reload the page to show the updated index
+            window.location.reload();
+        }, 1000);
+
+    } catch (error) {
+        console.error('Error in Get Started:', error);
+        messageDiv.className = 'message error show';
+        messageDiv.textContent = 'An error occurred. Please try again.';
+    }
+}
+
+// Show color scheme message (reused for database switching confirmations)
+function showColorSchemeMessage(message, type = 'success') {
+    const messageDiv = document.getElementById('colorSchemeMessage');
+    if (messageDiv) {
+        messageDiv.innerHTML = `<div class="${type}">${message}</div>`;
+        setTimeout(() => {
+            messageDiv.innerHTML = '';
+        }, 3000);
     }
 }

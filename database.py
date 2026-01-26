@@ -3,8 +3,203 @@ Database management for book indexing application
 """
 import sqlite3
 import re
+import shutil
 from pathlib import Path
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict
+
+# Required tables and their columns for database validation
+REQUIRED_TABLES = {
+    'terms': ['id', 'term', 'notes', 'created_at'],
+    'page_references': ['id', 'term_id', 'book_number', 'page_start', 'page_end', 'created_at'],
+    'books': ['id', 'book_number', 'book_name', 'page_count', 'created_at'],
+    'settings': ['key', 'value'],
+    'custom_properties': ['id', 'property_name', 'property_value', 'display_order', 'created_at'],
+    'gap_exclusions': ['id', 'book_number', 'page_start', 'page_end', 'created_at']
+}
+
+def sanitize_db_name(index_name: str) -> str:
+    """Convert index name to safe filename: 'My Index' -> 'index_My_Index.db'"""
+    safe = re.sub(r'[^\w\s-]', '', index_name).strip().replace(' ', '_')
+    return f"index_{safe}.db"
+
+
+class DatabaseManager:
+    """Manages multiple database instances"""
+
+    def __init__(self, databases_dir="databases"):
+        self.databases_dir = Path(databases_dir)
+        self.databases_dir.mkdir(exist_ok=True)
+        self.cache = {}  # Cache for loaded database instances
+
+    def list_databases(self) -> List[Dict[str, str]]:
+        """Discover all .db files and extract their index names"""
+        databases = []
+
+        for db_file in self.databases_dir.glob('*.db'):
+            try:
+                # Try to extract index name from database
+                conn = sqlite3.connect(str(db_file))
+                cursor = conn.cursor()
+                cursor.execute("SELECT value FROM settings WHERE key = 'index_name'")
+                result = cursor.fetchone()
+                conn.close()
+
+                index_name = result[0] if result else db_file.stem
+                databases.append({
+                    'db_name': db_file.name,
+                    'index_name': index_name
+                })
+            except:
+                # If can't read index name, use filename
+                databases.append({
+                    'db_name': db_file.name,
+                    'index_name': db_file.stem
+                })
+
+        return sorted(databases, key=lambda x: x['index_name'])
+
+    def validate_database(self, db_path: str) -> Tuple[bool, Optional[str], Optional[str]]:
+        """
+        Validate database has required schema
+        Returns: (is_valid, index_name, error_message)
+        """
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+
+            # Get all tables
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            tables = {row[0] for row in cursor.fetchall()}
+
+            # Check required tables
+            missing_tables = set(REQUIRED_TABLES.keys()) - tables
+            if missing_tables:
+                conn.close()
+                error = f"Database missing required tables: {', '.join(sorted(missing_tables))}"
+                return False, None, error
+
+            # Check columns for each table
+            for table, required_cols in REQUIRED_TABLES.items():
+                cursor.execute(f"PRAGMA table_info({table})")
+                existing_cols = {row[1] for row in cursor.fetchall()}
+                missing_cols = set(required_cols) - existing_cols
+
+                if missing_cols:
+                    conn.close()
+                    error = f"Table '{table}' missing columns: {', '.join(sorted(missing_cols))}"
+                    return False, None, error
+
+            # Extract index name
+            cursor.execute("SELECT value FROM settings WHERE key = 'index_name'")
+            result = cursor.fetchone()
+
+            if not result:
+                conn.close()
+                return False, None, "Database settings missing index_name"
+
+            index_name = result[0]
+            conn.close()
+
+            return True, index_name, None
+
+        except sqlite3.DatabaseError as e:
+            return False, None, f"Database file is corrupted or invalid: {str(e)}"
+        except Exception as e:
+            return False, None, f"Unexpected error: {str(e)}"
+
+    def get_database(self, db_name: str) -> 'IndexDatabase':
+        """Load and return database instance (with caching)"""
+        # Check cache first
+        if db_name in self.cache:
+            return self.cache[db_name]
+
+        db_path = self.databases_dir / db_name
+
+        # Create database instance
+        db = IndexDatabase(str(db_path))
+        self.cache[db_name] = db
+
+        return db
+
+    def import_database(self, uploaded_file, filename: str) -> Tuple[bool, str, Optional[str]]:
+        """
+        Import uploaded .db file
+        Returns: (success, db_name, error_message)
+        """
+        # Save to temporary location
+        temp_path = self.databases_dir / f"temp_{filename}"
+
+        try:
+            uploaded_file.save(str(temp_path))
+
+            # Validate database
+            is_valid, index_name, error = self.validate_database(str(temp_path))
+
+            if not is_valid:
+                temp_path.unlink()  # Delete temp file
+                return False, None, error
+
+            # Generate final filename
+            db_name = sanitize_db_name(index_name)
+            final_path = self.databases_dir / db_name
+
+            # Check if database already exists, add suffix if needed
+            counter = 2
+            while final_path.exists():
+                base_name = sanitize_db_name(index_name).replace('.db', '')
+                db_name = f"{base_name}_{counter}.db"
+                final_path = self.databases_dir / db_name
+                counter += 1
+
+            # Move temp file to final location
+            shutil.move(str(temp_path), str(final_path))
+
+            return True, db_name, None
+
+        except Exception as e:
+            # Clean up temp file if it exists
+            if temp_path.exists():
+                temp_path.unlink()
+            return False, None, f"Error importing database: {str(e)}"
+
+    def archive_database(self, db_name: str) -> Tuple[bool, Optional[str]]:
+        """
+        Archive a database by moving it to the archive subfolder
+        Returns: (success, error_message)
+        """
+        try:
+            # Create archive directory if it doesn't exist
+            archive_dir = self.databases_dir / 'archive'
+            archive_dir.mkdir(exist_ok=True)
+
+            # Source and destination paths
+            source_path = self.databases_dir / db_name
+            dest_path = archive_dir / db_name
+
+            # Check if source exists
+            if not source_path.exists():
+                return False, f"Database {db_name} not found"
+
+            # Handle duplicate names in archive
+            counter = 2
+            while dest_path.exists():
+                base_name = db_name.replace('.db', '')
+                archived_name = f"{base_name}_archived_{counter}.db"
+                dest_path = archive_dir / archived_name
+                counter += 1
+
+            # Move database to archive
+            shutil.move(str(source_path), str(dest_path))
+
+            # Remove from cache if present
+            if db_name in self.cache:
+                del self.cache[db_name]
+
+            return True, None
+
+        except Exception as e:
+            return False, f"Error archiving database: {str(e)}"
+
 
 class IndexDatabase:
     def __init__(self, db_path: str = "book_index.db"):
@@ -86,6 +281,17 @@ class IndexDatabase:
                     page_end INTEGER NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE(book_number, page_start, page_end)
+                )
+            ''')
+
+            # Create custom_properties table
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS custom_properties (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    property_name TEXT NOT NULL,
+                    property_value TEXT NOT NULL,
+                    display_order INTEGER NOT NULL DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
 
@@ -693,3 +899,77 @@ class IndexDatabase:
             removed = cursor.rowcount
             conn.commit()
             return removed
+
+    def add_custom_property(self, property_name: str, property_value: str) -> int:
+        """
+        Add a new custom property
+        Returns the ID of the added property
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            # Get the next display order
+            cursor.execute('SELECT COALESCE(MAX(display_order), -1) + 1 FROM custom_properties')
+            next_order = cursor.fetchone()[0]
+
+            cursor.execute('''
+                INSERT INTO custom_properties (property_name, property_value, display_order)
+                VALUES (?, ?, ?)
+            ''', (property_name, property_value, next_order))
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_all_custom_properties(self) -> List[Tuple[int, str, str, int]]:
+        """
+        Get all custom properties ordered by display_order
+        Returns list of (id, property_name, property_value, display_order) tuples
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT id, property_name, property_value, display_order
+                FROM custom_properties
+                ORDER BY display_order
+            ''')
+            return cursor.fetchall()
+
+    def update_custom_property(self, property_id: int, property_name: str, property_value: str) -> bool:
+        """
+        Update an existing custom property
+        Returns True if updated, False if not found
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE custom_properties
+                SET property_name = ?, property_value = ?
+                WHERE id = ?
+            ''', (property_name, property_value, property_id))
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def delete_custom_property(self, property_id: int) -> bool:
+        """
+        Delete a custom property
+        Returns True if deleted, False if not found
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM custom_properties WHERE id = ?', (property_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def reorder_custom_properties(self, property_ids: List[int]) -> bool:
+        """
+        Reorder custom properties based on the provided list of IDs
+        The order in the list determines the new display_order
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            for order, property_id in enumerate(property_ids):
+                cursor.execute('''
+                    UPDATE custom_properties
+                    SET display_order = ?
+                    WHERE id = ?
+                ''', (order, property_id))
+            conn.commit()
+            return True
