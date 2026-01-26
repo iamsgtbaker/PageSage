@@ -154,10 +154,9 @@ header {
 }
 
 h1 {
-    font-size: 3rem;
     color: var(--primary-color);
     margin-bottom: 0.5rem;
-    font-size: 2.75em;
+    font-size: 3.25em;
     font-weight: 700;
     line-height: 1.3;
     margin: 0 0 0 0;
@@ -1018,9 +1017,14 @@ small {
 
 footer {
     text-align: center;
-    margin-top: 1rem;
-    padding-top: 1rem;
-    color: var(--secondary-color);
+}
+
+footer h2 {
+    text-transform: uppercase;
+    color: var(--text-color);
+    font-size: 1.5rem;
+    letter-spacing: 0.2em;
+    margin: 0;
 }
 
 #rotatingTagline {
@@ -1265,6 +1269,7 @@ footer {
     cursor: default;
     visibility: hidden;
     z-index: 10002;
+    font-family: "Source Sans Pro", -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
 }
 
 #menu > .inner {
@@ -1285,7 +1290,7 @@ footer {
     font-weight: 900;
     letter-spacing: 0.35em;
     text-transform: uppercase;
-    font-size: 0.9em;
+    font-size: 1.1em;
     margin-bottom: 1.5em;
 }
 
@@ -1307,6 +1312,7 @@ footer {
     border: 0;
     color: inherit;
     text-decoration: none;
+    font-size: 1.2em;
 }
 
 #menu > .inner > ul > li a:hover {
@@ -1462,6 +1468,7 @@ body.is-menu-visible #menu .close {
 .index-name-clickable {
     cursor: pointer;
     transition: color 0.2s;
+    font-size: 3.25rem;
 }
 
 .index-name-clickable:hover {

@@ -57,9 +57,9 @@ function startTaglineRotation() {
             setTimeout(() => {
                 taglineElement.textContent = taglines[currentTaglineIndex];
                 taglineElement.style.opacity = '1';
-            }, 300);
+            }, 1000);
         }
-    }, 4000);
+    }, 7000);
 }
 
 // Hamburger Menu Control

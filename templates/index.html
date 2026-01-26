@@ -13,10 +13,10 @@
             <header id="header">
             <div class="header-content">
                 <div>
-                    <a href="/" class="logo">
+                    <span class="logo">
                         <span class="symbol"><img src="{{ url_for('static', filename='logo-icon.jpg') }}" alt="Index it! Logo" /></span>
                         <h2>Index it!</h2>
-                    </a>
+					</span>
                     <div style="position: relative;">
                         <h1 id="indexName" class="index-name-clickable" onclick="showDatabaseSwitcher()">Create and manage your book index offline</h1>
 
@@ -814,9 +814,8 @@
                 </div>
             </div>
         </div>
-
         <footer>
-            <p><span id="rotatingTagline">Build your exam reference, fast</span></p>
+            <h2><span id="rotatingTagline">Build your exam reference, fast</span></h2>
         </footer>
         </div>
     </div>
