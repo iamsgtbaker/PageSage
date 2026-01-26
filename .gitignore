@@ -3,6 +3,9 @@
 *.db.bak
 databases/
 
+# Exception: allow demo database
+!demo/*.db
+
 # Python
 __pycache__/
 *.py[cod]
