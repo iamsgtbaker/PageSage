@@ -1523,7 +1523,7 @@ body.is-menu-visible #menu .close {
 }
 
 .database-list li.active a {
-    background: rgba(242, 132, 158, 0.15);
+    background: var(--message-success-bg);
     color: var(--secondary-color);
     font-weight: 600;
     border-left: 3px solid var(--secondary-color);
