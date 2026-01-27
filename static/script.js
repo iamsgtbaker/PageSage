@@ -1536,16 +1536,20 @@ function updateColorSelectBackground(color) {
     }
 }
 
-// Update hamburger menu hover color
+// Update hamburger menu and close icon hover colors
 function updateHamburgerMenuColor(color) {
     // Remove '#' from color and URL-encode it for SVG
     const colorEncoded = encodeURIComponent(color);
 
-    // Create SVG data URI with the new color
-    const svgDataUri = `url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cstyle%3Eline %7B stroke-width: 8px%3B stroke: ${colorEncoded}%3B %7D%3C/style%3E%3Cline x1='0' y1='25' x2='100' y2='25' /%3E%3Cline x1='0' y1='50' x2='100' y2='50' /%3E%3Cline x1='0' y1='75' x2='100' y2='75' /%3E%3C/svg%3E")`;
+    // Create SVG data URI with the new color for hamburger icon
+    const hamburgerSvg = `url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cstyle%3Eline %7B stroke-width: 8px%3B stroke: ${colorEncoded}%3B %7D%3C/style%3E%3Cline x1='0' y1='25' x2='100' y2='25' /%3E%3Cline x1='0' y1='50' x2='100' y2='50' /%3E%3Cline x1='0' y1='75' x2='100' y2='75' /%3E%3C/svg%3E")`;
 
-    // Update CSS custom property for hamburger menu
-    document.documentElement.style.setProperty('--hamburger-hover-icon', svgDataUri);
+    // Create SVG data URI with the new color for close icon
+    const closeSvg = `url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cstyle%3Eline %7B stroke-width: 8px%3B stroke: ${colorEncoded}%3B %7D%3C/style%3E%3Cline x1='15' y1='15' x2='85' y2='85' /%3E%3Cline x1='85' y1='15' x2='15' y2='85' /%3E%3C/svg%3E")`;
+
+    // Update CSS custom properties
+    document.documentElement.style.setProperty('--hamburger-hover-icon', hamburgerSvg);
+    document.documentElement.style.setProperty('--close-hover-icon', closeSvg);
 }
 
 // Backup database
