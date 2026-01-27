@@ -1135,6 +1135,11 @@ footer h2 {
     background: var(--secondary-color);
 }
 
+/* Hide mobile-only menu items on desktop (default state) */
+#menu > .inner > ul > li.mobile-only {
+    display: none;
+}
+
 /* Responsive design */
 @media (max-width: 900px) {
     h1 {
@@ -1335,11 +1340,6 @@ footer h2 {
     height: 0.5em;
     border-top: solid 2px rgba(255, 255, 255, 0.25);
     margin: 0.5em 0;
-}
-
-/* Hide mobile-only items on desktop */
-#menu > .inner > ul > li.mobile-only {
-    display: none;
 }
 
 /* Close button (X) */
