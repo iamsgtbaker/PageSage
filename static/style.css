@@ -1162,6 +1162,11 @@ footer h2 {
     .tabs {
         display: none;
     }
+
+    /* Show mobile-only menu items when tabs are hidden */
+    #menu > .inner > ul > li.mobile-only {
+        display: block;
+    }
 }
 
 /* Hamburger Menu Styles (from Phantom Template) */
@@ -1457,11 +1462,6 @@ body.is-menu-visible #menu .close {
     #menu > .close:before,
     #menu > .close:after {
         background-size: 1.5em 1.5em;
-    }
-
-    /* Show mobile-only menu items on mobile */
-    #menu > .inner > ul > li.mobile-only {
-        display: block;
     }
 }
 
