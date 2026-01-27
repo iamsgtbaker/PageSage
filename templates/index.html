@@ -646,6 +646,140 @@
             </div>
         </div>
 
+        <!-- CLI Reference Modal -->
+        <div id="cliModal" class="modal">
+            <div class="modal-content" style="max-width: 800px;">
+                <div class="modal-header">
+                    <h2>CLI Reference</h2>
+                    <button class="modal-close" onclick="closeCliModal()">&times;</button>
+                </div>
+                <div class="modal-body" style="font-family: 'Source Sans Pro', monospace; max-height: 70vh; overflow-y: auto;">
+                    <pre style="background: var(--bg-color); padding: 1.5em; border-radius: 8px; overflow-x: auto; font-size: 0.9em; line-height: 1.6; white-space: pre-wrap; word-wrap: break-word;">
+<strong>NAME</strong>
+    index_cli.py - Command line interface for Index it!
+
+<strong>SYNOPSIS</strong>
+    python index_cli.py [-d DATABASE] COMMAND [OPTIONS]
+
+<strong>DESCRIPTION</strong>
+    A command line tool for creating and managing book indexes offline.
+    Use this tool for scripting, automation, or when you prefer working
+    in the terminal.
+
+<strong>GLOBAL OPTIONS</strong>
+    -d, --database FILE
+        Specify the database file to use (default: book_index.db)
+
+<strong>COMMANDS</strong>
+
+    <strong style="color: var(--secondary-color);">add</strong> TERM REFERENCE
+        Add a new index entry.
+
+        Arguments:
+            TERM        The index term to add
+            REFERENCE   Page reference in format book:page or book:start-end
+
+        Examples:
+            python index_cli.py add "machine learning" 1:42
+            python index_cli.py add "neural networks" 2:15-18
+            python index_cli.py add "deep learning" 1:50
+
+    <strong style="color: var(--secondary-color);">list</strong>
+        List all index entries grouped by letter.
+
+        Example:
+            python index_cli.py list
+
+    <strong style="color: var(--secondary-color);">search</strong> PATTERN
+        Search for entries matching a pattern.
+
+        Arguments:
+            PATTERN     Search pattern (case-insensitive)
+
+        Examples:
+            python index_cli.py search "learning"
+            python index_cli.py search "network"
+
+    <strong style="color: var(--secondary-color);">delete</strong> TERM [REFERENCE]
+        Delete an entry or specific reference.
+
+        Arguments:
+            TERM        The term to delete
+            REFERENCE   Optional: specific reference to delete
+                       If omitted, deletes all references for the term
+
+        Examples:
+            python index_cli.py delete "old term" 1:10
+            python index_cli.py delete "obsolete term"
+
+    <strong style="color: var(--secondary-color);">update</strong> TERM OLD_REFERENCE NEW_REFERENCE
+        Update an existing reference.
+
+        Arguments:
+            TERM            The term to update
+            OLD_REFERENCE   Current reference value
+            NEW_REFERENCE   New reference value
+
+        Example:
+            python index_cli.py update "machine learning" 1:42 1:45
+
+    <strong style="color: var(--secondary-color);">export</strong> [-o OUTPUT] [-f FORMAT] [-t TITLE]
+        Export the index to a file.
+
+        Options:
+            -o, --output FILE   Output filename (default: index.txt)
+            -f, --format FMT    Output format: latex, plain, markdown, pdf
+                               (default: latex)
+            -t, --title TEXT    Index title (default: Index)
+
+        Examples:
+            python index_cli.py export -f pdf -o my_index.pdf
+            python index_cli.py export -f latex -o index.tex -t "Study Guide"
+            python index_cli.py export -f markdown -o index.md
+
+<strong>REFERENCE FORMAT</strong>
+    References must be in the format: book:page or book:start-end
+
+    Examples:
+        1:42        Book 1, page 42
+        2:15-18     Book 2, pages 15 through 18
+        3:100       Book 3, page 100
+
+<strong>DATABASE</strong>
+    By default, the CLI uses 'book_index.db' in the current directory.
+    Use the -d option to specify a different database file.
+
+    The same database can be used with both the CLI and web interface.
+
+<strong>EXAMPLES</strong>
+    # Create a new index and add entries
+    python index_cli.py add "TCP/IP" 1:25-30
+    python index_cli.py add "TCP/IP" 2:15
+    python index_cli.py add "UDP protocol" 1:45
+
+    # List all entries
+    python index_cli.py list
+
+    # Search for networking terms
+    python index_cli.py search "protocol"
+
+    # Export to PDF
+    python index_cli.py export -f pdf -o network_index.pdf -t "Network Index"
+
+    # Use a specific database
+    python index_cli.py -d my_study.db add "Important topic" 1:100
+
+<strong>SEE ALSO</strong>
+    Web interface: python web_app.py
+    GitHub: https://github.com/iamsgtbaker/IndexIt
+                    </pre>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeCliModal()">Close</button>
+                </div>
+            </div>
+        </div>
+
         <!-- CSV Help Modal -->
         <div id="csvHelpModal" class="modal">
             <div class="modal-content" style="max-width: 600px;">
@@ -837,6 +971,7 @@
                 <!-- Info links (all devices) -->
                 <li><a href="#" onclick="showAboutModal(); return false;">About</a></li>
                 <li><a href="#" onclick="showHelpModal(); return false;">Help</a></li>
+                <li><a href="#" onclick="showCliModal(); return false;">CLI Reference</a></li>
                 <li><a href="https://github.com/iamsgtbaker/IndexIt" target="_blank" rel="noopener">GitHub</a></li>
                 <li><a href="https://buymeacoffee.com/iamsgtbaker" title="Did Index it! help get your exam pass? Show your appreciation by donating a few bucks." target="_blank" rel="noopener">☕ Buy me a coffee</a></li>
             </ul>

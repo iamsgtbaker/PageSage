@@ -118,6 +118,17 @@ function closeHelpModal() {
     document.getElementById('helpModal').classList.remove('show');
 }
 
+function showCliModal() {
+    menuHide();
+    setTimeout(() => {
+        document.getElementById('cliModal').classList.add('show');
+    }, 350);
+}
+
+function closeCliModal() {
+    document.getElementById('cliModal').classList.remove('show');
+}
+
 function showCsvHelpModal() {
     document.getElementById('csvHelpModal').classList.add('show');
 }
@@ -261,6 +272,12 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('helpModal').addEventListener('click', function(e) {
         if (e.target.id === 'helpModal') {
             closeHelpModal();
+        }
+    });
+
+    document.getElementById('cliModal').addEventListener('click', function(e) {
+        if (e.target.id === 'cliModal') {
+            closeCliModal();
         }
     });
 
@@ -2413,6 +2430,8 @@ function handleGlobalKeyboardShortcuts(e) {
             closeAboutModal();
         } else if (document.getElementById('helpModal').classList.contains('show')) {
             closeHelpModal();
+        } else if (document.getElementById('cliModal').classList.contains('show')) {
+            closeCliModal();
         }
         return;
     }
