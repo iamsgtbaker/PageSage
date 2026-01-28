@@ -8,6 +8,7 @@ let selectedLetter = null;
 let selectedNotesLetter = null;
 let currentSearchQuery = '';
 let autocompleteIndex = -1;
+let lastAutocompleteTerm = '';  // Track last autocomplete-selected term
 let lastUsedBook = '';
 let selectedBookFilter = '';
 let recentEntriesOffset = 0;
@@ -629,6 +630,7 @@ async function handleAddEntry(e) {
 
             // Reset form
             document.getElementById('addForm').reset();
+            lastAutocompleteTerm = '';  // Reset autocomplete tracking
 
             // Restore the last used book in the dropdown
             if (lastUsedBook) {
@@ -2193,6 +2195,7 @@ function setupAutocomplete() {
             item.addEventListener('click', async function() {
                 const selectedTerm = this.getAttribute('data-value');
                 input.value = selectedTerm;
+                lastAutocompleteTerm = selectedTerm;  // Track selected term
                 autocompleteList.classList.remove('show');
                 autocompleteList.innerHTML = '';
 
@@ -2202,6 +2205,15 @@ function setupAutocomplete() {
                 document.getElementById('book').focus();
             });
         });
+    });
+
+    // Clear pre-loaded data when term is modified after autocomplete selection
+    input.addEventListener('input', function() {
+        if (lastAutocompleteTerm && input.value !== lastAutocompleteTerm) {
+            // Term was modified after autocomplete selection - clear notes
+            document.getElementById('notes').value = '';
+            lastAutocompleteTerm = '';  // Reset tracking
+        }
     });
 
     // Handle keyboard navigation
@@ -2223,6 +2235,7 @@ function setupAutocomplete() {
                 e.preventDefault();
                 const selectedTerm = items[autocompleteIndex].getAttribute('data-value');
                 input.value = selectedTerm;
+                lastAutocompleteTerm = selectedTerm;  // Track selected term
                 autocompleteList.classList.remove('show');
                 autocompleteList.innerHTML = '';
                 autocompleteIndex = -1;
