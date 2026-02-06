@@ -3,6 +3,9 @@
 *.db.bak
 databases/
 
+# Prototype files
+templates/progress_prototype.html
+
 # Exception: allow demo database
 !demo/*.db
 

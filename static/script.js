@@ -73,12 +73,6 @@ function menuLock() {
     return true;
 }
 
-function menuShow() {
-    if (menuLock()) {
-        document.body.classList.add('is-menu-visible');
-    }
-}
-
 function menuHide() {
     if (menuLock()) {
         document.body.classList.remove('is-menu-visible');
@@ -138,20 +132,50 @@ function closeCsvHelpModal() {
     document.getElementById('csvHelpModal').classList.remove('show');
 }
 
+function showAiHelpModal() {
+    document.getElementById('aiHelpModal').classList.add('show');
+}
+
+function closeAiHelpModal() {
+    document.getElementById('aiHelpModal').classList.remove('show');
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     loadEntries();
     loadSettings();
     loadBookDropdowns();
     loadRecentEntries();
+    restoreLastOpenedTool();
+    restoreLastOpenedSetting();
+    initStudyMode();
 
     // Setup form submission
     document.getElementById('addForm').addEventListener('submit', handleAddEntry);
     document.getElementById('editForm').addEventListener('submit', handleEditEntry);
     document.getElementById('importForm').addEventListener('submit', handleImportCSV);
+    document.getElementById('importNotesForm').addEventListener('submit', handleImportNotes);
     document.getElementById('editNotesForm').addEventListener('submit', handleEditNotes);
     document.getElementById('editBookForm').addEventListener('submit', handleEditBook);
     document.getElementById('addBookModalForm').addEventListener('submit', handleAddBookModal);
+
+    // Submit add entry form when Enter is pressed on page inputs
+    const pageInput = document.getElementById('page');
+    const pageEndInput = document.getElementById('pageEnd');
+
+    pageInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            document.getElementById('addForm').dispatchEvent(new Event('submit', { cancelable: true }));
+        }
+    });
+
+    pageEndInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            document.getElementById('addForm').dispatchEvent(new Event('submit', { cancelable: true }));
+        }
+    });
 
     // Database management forms
     const importDbForm = document.getElementById('importDatabaseForm');
@@ -183,44 +207,54 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // Keyboard shortcut: "0" to toggle index switcher
+    document.addEventListener('keydown', function(event) {
+        // Ignore if typing in an input, textarea, or select
+        const activeElement = document.activeElement;
+        const isTyping = activeElement.tagName === 'INPUT' ||
+                         activeElement.tagName === 'TEXTAREA' ||
+                         activeElement.tagName === 'SELECT' ||
+                         activeElement.isContentEditable;
+
+        if (isTyping) return;
+
+        // Check for "0" key
+        if (event.key === '0') {
+            event.preventDefault();
+            showDatabaseSwitcher();
+        }
+    });
+
     // Setup search
     document.getElementById('searchInput').addEventListener('input', handleSearch);
-    document.getElementById('notesSearchInput').addEventListener('input', handleNotesSearch);
 
-    // Close modal on background click
-    document.getElementById('editModal').addEventListener('click', function(e) {
-        if (e.target.id === 'editModal') {
-            closeEditModal();
-        }
-    });
+    // Close modals on background click - setup all modals with their close functions
+    const modalCloseHandlers = {
+        'editModal': closeEditModal,
+        'editNotesModal': closeEditNotesModal,
+        'gapActionModal': closeGapActionModal,
+        'reincludeModal': closeReincludeModal,
+        'editBookModal': closeEditBookModal,
+        'addBookModal': closeAddBookModal,
+        'aboutModal': closeAboutModal,
+        'helpModal': closeHelpModal,
+        'cliModal': closeCliModal,
+        'csvHelpModal': closeCsvHelpModal,
+        'aiHelpModal': closeAiHelpModal,
+        'editPropertyModal': closeEditPropertyModal,
+        'editBookPropertyModal': closeEditBookPropertyModal,
+        'createIndexModal': closeCreateIndexModal,
+        'importDatabaseModal': closeImportDatabaseModal,
+        'createDatabaseModal': closeCreateDatabaseModal,
+        'getStartedModal': closeGetStartedModal
+    };
 
-    document.getElementById('editNotesModal').addEventListener('click', function(e) {
-        if (e.target.id === 'editNotesModal') {
-            closeEditNotesModal();
-        }
-    });
-
-    document.getElementById('gapActionModal').addEventListener('click', function(e) {
-        if (e.target.id === 'gapActionModal') {
-            closeGapActionModal();
-        }
-    });
-
-    document.getElementById('reincludeModal').addEventListener('click', function(e) {
-        if (e.target.id === 'reincludeModal') {
-            closeReincludeModal();
-        }
-    });
-
-    document.getElementById('editBookModal').addEventListener('click', function(e) {
-        if (e.target.id === 'editBookModal') {
-            closeEditBookModal();
-        }
-    });
-
-    document.getElementById('addBookModal').addEventListener('click', function(e) {
-        if (e.target.id === 'addBookModal') {
-            closeAddBookModal();
+    Object.entries(modalCloseHandlers).forEach(([modalId, closeFunc]) => {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.addEventListener('click', (e) => {
+                if (e.target.id === modalId) closeFunc();
+            });
         }
     });
 
@@ -262,25 +296,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         menuPanel.appendChild(closeButton);
     }
-
-    // Setup modal background clicks for new modals
-    document.getElementById('aboutModal').addEventListener('click', function(e) {
-        if (e.target.id === 'aboutModal') {
-            closeAboutModal();
-        }
-    });
-
-    document.getElementById('helpModal').addEventListener('click', function(e) {
-        if (e.target.id === 'helpModal') {
-            closeHelpModal();
-        }
-    });
-
-    document.getElementById('cliModal').addEventListener('click', function(e) {
-        if (e.target.id === 'cliModal') {
-            closeCliModal();
-        }
-    });
 
     // Setup autocomplete
     setupAutocomplete();
@@ -336,9 +351,9 @@ function switchTab(tabName) {
         loadEntries();
     }
 
-    // If switching to notes tab, refresh notes
-    if (tabName === 'notes') {
-        loadNotes();
+    // If switching to progress tab, run gap analysis
+    if (tabName === 'progress') {
+        runGapAnalysis();
     }
 
     // If switching to books tab, load books
@@ -352,10 +367,9 @@ function switchTab(tabName) {
     }
 }
 
-// Toggle recent entries section
 // Toggle tools section with accordion behavior
-function toggleToolsSection(section) {
-    const sections = ['import', 'export', 'gaps'];
+function toggleToolsSection(section, savePreference = true) {
+    const sections = ['import', 'export', 'ai', 'study'];
 
     sections.forEach(s => {
         const container = document.getElementById(`${s}Container`);
@@ -367,13 +381,23 @@ function toggleToolsSection(section) {
                 container.classList.remove('collapsed');
                 toggle.textContent = '▼';
 
-                // Run gap analysis if opening gaps section
-                if (section === 'gaps') {
-                    runGapAnalysis();
+                // Save preference to localStorage
+                if (savePreference) {
+                    localStorage.setItem('lastOpenedTool', section);
+                }
+
+                // Check AI settings to show/hide enrich button
+                if (section === 'ai') {
+                    loadAiEnrichment();
                 }
             } else {
                 container.classList.add('collapsed');
                 toggle.textContent = '▶';
+
+                // Clear preference when closing
+                if (savePreference) {
+                    localStorage.removeItem('lastOpenedTool');
+                }
             }
         } else {
             // Collapse other sections
@@ -383,7 +407,57 @@ function toggleToolsSection(section) {
     });
 }
 
-// Toggle CSV format help
+// Restore last opened tool section
+function restoreLastOpenedTool() {
+    const lastTool = localStorage.getItem('lastOpenedTool');
+    if (lastTool && ['import', 'export', 'gaps', 'ai'].includes(lastTool)) {
+        toggleToolsSection(lastTool, false);
+    }
+}
+
+// Toggle settings section with accordion behavior
+function toggleSettingsSection(section, savePreference = true) {
+    const sections = ['indexSettings', 'appearance', 'indexManagement', 'aiFeatures'];
+
+    sections.forEach(s => {
+        const container = document.getElementById(`${s}Container`);
+        const toggle = document.getElementById(`${s}Toggle`);
+
+        if (s === section) {
+            // Toggle the clicked section
+            if (container.classList.contains('collapsed')) {
+                container.classList.remove('collapsed');
+                toggle.textContent = '▼';
+
+                // Save preference to localStorage
+                if (savePreference) {
+                    localStorage.setItem('lastOpenedSetting', section);
+                }
+            } else {
+                container.classList.add('collapsed');
+                toggle.textContent = '▶';
+
+                // Clear preference when closing
+                if (savePreference) {
+                    localStorage.removeItem('lastOpenedSetting');
+                }
+            }
+        } else {
+            // Collapse other sections
+            container.classList.add('collapsed');
+            toggle.textContent = '▶';
+        }
+    });
+}
+
+// Restore last opened settings section
+function restoreLastOpenedSetting() {
+    const lastSetting = localStorage.getItem('lastOpenedSetting');
+    if (lastSetting && ['indexSettings', 'appearance', 'indexManagement', 'aiFeatures'].includes(lastSetting)) {
+        toggleSettingsSection(lastSetting, false);
+    }
+}
+
 // Export index from dropdown
 function exportIndexFromDropdown() {
     const format = document.getElementById('indexExportFormat').value;
@@ -462,9 +536,28 @@ function showMoreRecentEntries() {
 // Load all entries
 async function loadEntries() {
     try {
-        const response = await fetch('/api/entries');
-        const data = await response.json();
-        allEntries = data.entries;
+        // Fetch entries and notes in parallel
+        const [entriesResponse, notesResponse] = await Promise.all([
+            fetch('/api/entries'),
+            fetch('/api/notes')
+        ]);
+
+        const entriesData = await entriesResponse.json();
+        const notesData = await notesResponse.json();
+
+        // Create notes lookup map
+        const notesMap = {};
+        if (notesData.notes) {
+            notesData.notes.forEach(note => {
+                notesMap[note.term.toLowerCase()] = note.notes;
+            });
+        }
+
+        // Combine entries with their notes
+        allEntries = entriesData.entries.map(entry => ({
+            ...entry,
+            notes: notesMap[entry.term.toLowerCase()] || null
+        }));
 
         // If no letter is selected and we have entries, select the first letter alphabetically
         if (!selectedLetter && allEntries.length > 0) {
@@ -497,6 +590,21 @@ function refreshEntries() {
     currentSearchQuery = '';
     selectedLetter = null;
     loadEntries();
+}
+
+// Toggle notes display without resetting view
+function toggleNotesDisplay() {
+    // Re-display with current filters intact
+    if (currentSearchQuery) {
+        const lowerQuery = currentSearchQuery.toLowerCase();
+        const filtered = allEntries.filter(entry =>
+            entry.term.toLowerCase().includes(lowerQuery) ||
+            (entry.notes && entry.notes.toLowerCase().includes(lowerQuery))
+        );
+        displayEntries(filtered);
+    } else {
+        displayEntries(allEntries);
+    }
 }
 
 // Build letter navigation
@@ -686,14 +794,21 @@ async function handleImportCSV(e) {
 }
 
 // Display import results
-function displayImportResults(data) {
+function displayImportResults(data, isNotesImport = false) {
     const resultsDiv = document.getElementById('importResults');
 
     let html = '<h3>Import Results:</h3><ul>';
-    html += `<li>Successfully imported: ${data.imported || 0} entries</li>`;
 
-    if (data.skipped && data.skipped > 0) {
-        html += `<li>Skipped (duplicates): ${data.skipped} entries</li>`;
+    if (isNotesImport) {
+        html += `<li>New terms created: ${data.imported || 0}</li>`;
+        if (data.skipped && data.skipped > 0) {
+            html += `<li>Existing terms updated: ${data.skipped}</li>`;
+        }
+    } else {
+        html += `<li>Successfully imported: ${data.imported || 0} entries</li>`;
+        if (data.skipped && data.skipped > 0) {
+            html += `<li>Skipped (duplicates): ${data.skipped} entries</li>`;
+        }
     }
 
     if (data.errors && data.errors.length > 0) {
@@ -725,6 +840,65 @@ function showImportMessage(text, type = 'success') {
     setTimeout(() => {
         messageDiv.classList.remove('show');
     }, 5000);
+}
+
+// Switch import tabs
+function switchImportTab(tab) {
+    // Update tab buttons
+    document.querySelectorAll('.import-tab').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+
+    // Update tab content
+    document.querySelectorAll('.import-tab-content').forEach(content => {
+        content.classList.remove('active');
+    });
+
+    if (tab === 'references') {
+        document.getElementById('importReferencesTab').classList.add('active');
+    } else if (tab === 'notes') {
+        document.getElementById('importNotesTab').classList.add('active');
+    }
+
+    // Clear any previous messages and results
+    document.getElementById('importMessage').className = 'message';
+    document.getElementById('importResults').classList.remove('show');
+}
+
+// Handle notes import
+async function handleImportNotes(e) {
+    e.preventDefault();
+
+    const csvData = document.getElementById('csvNotesData').value.trim();
+
+    if (!csvData) {
+        showImportMessage('Please paste CSV data to import', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/import/notes', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ csv_data: csvData })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showImportMessage(data.message, 'success');
+            displayImportResults(data, true);
+            document.getElementById('csvNotesData').value = '';
+            loadNotes();
+        } else {
+            showImportMessage(data.error || 'Failed to import notes', 'error');
+        }
+    } catch (error) {
+        showImportMessage('Error: ' + error.message, 'error');
+    }
 }
 
 // Load all notes
@@ -992,8 +1166,10 @@ function handleSearch(e) {
             selectedLetter = null;
             buildLetterNavigation();
 
+            const lowerQuery = query.toLowerCase();
             const filtered = allEntries.filter(entry =>
-                entry.term.toLowerCase().includes(query.toLowerCase())
+                entry.term.toLowerCase().includes(lowerQuery) ||
+                (entry.notes && entry.notes.toLowerCase().includes(lowerQuery))
             );
             displayEntries(filtered);
         }
@@ -1065,10 +1241,12 @@ function displayEntries(entries) {
         html += `<div class="letter-group">`;
         html += `<div class="letter-heading">${letter}</div>`;
 
+        const showNotes = document.getElementById('showNotesCheckbox')?.checked ?? true;
+
         grouped[letter].forEach(entry => {
             totalShown++;
             html += `<div class="entry-item">`;
-            html += `<div><div class="entry-term">${escapeHtml(entry.term)}</div>`;
+            html += `<div class="entry-content"><div class="entry-term">${escapeHtml(entry.term)}</div>`;
 
             // Display references on one line, separated by commas
             html += `<div class="entry-refs">`;
@@ -1077,6 +1255,11 @@ function displayEntries(entries) {
                 html += `<span class="ref-link" onclick="editEntry('${escapeHtml(entry.term)}', '${escapeHtml(ref)}')">${escapeHtml(ref)}</span>`;
             });
             html += `</div>`;
+
+            // Display notes if available and checkbox is checked
+            if (showNotes && entry.notes) {
+                html += `<div class="entry-notes">${escapeHtml(entry.notes)}</div>`;
+            }
 
             html += `</div></div>`;
         });
@@ -1412,6 +1595,9 @@ async function loadSettingsTab() {
 
         // Load custom properties
         loadCustomProperties();
+
+        // Load AI settings
+        loadAiEnrichment();
     } catch (error) {
         console.error('Error loading settings:', error);
     }
@@ -1765,10 +1951,6 @@ async function saveEditedProperty(event) {
 async function deletePropertyFromModal() {
     const propertyId = document.getElementById('editPropertyModalId').value;
 
-    if (!confirm('Are you sure you want to delete this property?')) {
-        return;
-    }
-
     try {
         const response = await fetch(`/api/custom-properties/${propertyId}`, {
             method: 'DELETE'
@@ -1949,15 +2131,33 @@ function displayBooks(books) {
 
     let html = '';
     books.forEach(book => {
-        html += `<div class="book-item">`;
+        html += `<div class="book-item" data-book-number="${escapeHtml(book.book_number)}">`;
+        html += `<div class="book-header" onclick="toggleBookExpand(${escapeHtml(book.book_number)})">`;
         html += `<div class="book-info">`;
+        html += `<span class="book-expand-icon" id="bookExpandIcon_${book.book_number}">▶</span>`;
         html += `<span class="book-number">Book ${escapeHtml(book.book_number)}:</span>`;
         html += `<span class="book-name">${escapeHtml(book.book_name)}</span>`;
         html += `<span class="book-pages">(${book.page_count} pages)</span>`;
         html += `</div>`;
         html += `<div class="book-actions">`;
-        html += `<button class="btn btn-secondary book-edit-btn" data-number="${escapeHtml(book.book_number)}" data-name="${escapeHtml(book.book_name)}" data-pages="${book.page_count}">Edit</button>`;
+        html += `<button class="btn btn-secondary book-edit-btn" data-number="${escapeHtml(book.book_number)}" data-name="${escapeHtml(book.book_name)}" data-pages="${book.page_count}" onclick="event.stopPropagation();">Edit</button>`;
         html += `</div></div>`;
+        html += `<div class="book-details" id="bookDetails_${book.book_number}" style="display: none;">`;
+        html += `<div class="book-metadata-section">`;
+        html += `<p class="settings-help" style="margin: 0 0 0.75rem 0;">Click a property to edit, drag to reorder.</p>`;
+        html += `<div class="form-row" style="display: flex; gap: 1rem; margin-bottom: 1rem;">`;
+        html += `<div class="form-group" style="flex: 1; margin: 0;">`;
+        html += `<label>Metadata:</label>`;
+        html += `<input type="text" id="bookPropName_${book.book_number}" placeholder="e.g., Author, Publisher">`;
+        html += `</div>`;
+        html += `<div class="form-group" style="flex: 1; margin: 0;">`;
+        html += `<label>Value:</label>`;
+        html += `<input type="text" id="bookPropValue_${book.book_number}" placeholder="e.g., John Smith">`;
+        html += `</div>`;
+        html += `</div>`;
+        html += `<button class="btn btn-primary" onclick="addBookProperty(${book.book_number})">Add Metadata</button>`;
+        html += `<div class="custom-properties-table" id="bookProperties_${book.book_number}" style="margin-top: 1rem;"></div>`;
+        html += `</div></div></div>`;
     });
 
     container.innerHTML = html;
@@ -1973,6 +2173,268 @@ function displayBooks(books) {
         });
     });
 }
+
+// Toggle book expand/collapse
+async function toggleBookExpand(bookNumber) {
+    const details = document.getElementById(`bookDetails_${bookNumber}`);
+    const icon = document.getElementById(`bookExpandIcon_${bookNumber}`);
+
+    if (details.style.display === 'none') {
+        details.style.display = 'block';
+        icon.textContent = '▼';
+        // Load book properties
+        await loadBookProperties(bookNumber);
+    } else {
+        details.style.display = 'none';
+        icon.textContent = '▶';
+    }
+}
+
+// Load book custom properties
+async function loadBookProperties(bookNumber) {
+    try {
+        const response = await fetch(`/api/books/${bookNumber}/properties`);
+        const data = await response.json();
+        displayBookProperties(bookNumber, data.properties);
+    } catch (error) {
+        console.error('Error loading book properties:', error);
+    }
+}
+
+// Display book custom properties
+// Store book properties for each book
+let bookPropertiesCache = {};
+
+function displayBookProperties(bookNumber, properties) {
+    const container = document.getElementById(`bookProperties_${bookNumber}`);
+
+    // Cache properties for this book
+    bookPropertiesCache[bookNumber] = properties;
+
+    if (properties.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    let html = '';
+    properties.forEach(prop => {
+        html += `<div class="property-row" draggable="true" data-property-id="${prop.id}" data-book-number="${bookNumber}">`;
+        html += `<span class="drag-handle">☰</span>`;
+        html += `<div class="property-row-content" onclick="openEditBookPropertyModal(${prop.id}, ${bookNumber})">`;
+        html += `<div class="property-name">${escapeHtml(prop.property_name)}</div>`;
+        html += `<div class="property-value">${escapeHtml(prop.property_value)}</div>`;
+        html += `</div>`;
+        html += `</div>`;
+    });
+
+    container.innerHTML = html;
+
+    // Add drag and drop event listeners
+    const propertyRows = container.querySelectorAll('.property-row');
+    propertyRows.forEach(row => {
+        row.addEventListener('dragstart', handleBookPropertyDragStart);
+        row.addEventListener('dragend', handleBookPropertyDragEnd);
+        row.addEventListener('dragover', handleBookPropertyDragOver);
+        row.addEventListener('drop', handleBookPropertyDrop);
+        row.addEventListener('dragenter', handleBookPropertyDragEnter);
+        row.addEventListener('dragleave', handleBookPropertyDragLeave);
+    });
+}
+
+// Add book custom property
+async function addBookProperty(bookNumber) {
+    const nameInput = document.getElementById(`bookPropName_${bookNumber}`);
+    const valueInput = document.getElementById(`bookPropValue_${bookNumber}`);
+    const propertyName = nameInput.value.trim();
+    const propertyValue = valueInput.value.trim();
+
+    if (!propertyName || !propertyValue) {
+        showSettingsMessage('bookManagementMessage', 'Property name and value are required', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/books/${bookNumber}/properties`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                property_name: propertyName,
+                property_value: propertyValue
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            nameInput.value = '';
+            valueInput.value = '';
+            loadBookProperties(bookNumber);
+        } else {
+            showSettingsMessage('bookManagementMessage', data.error || 'Failed to add property', 'error');
+        }
+    } catch (error) {
+        showSettingsMessage('bookManagementMessage', 'Error: ' + error.message, 'error');
+    }
+}
+
+// Open edit book property modal
+function openEditBookPropertyModal(propertyId, bookNumber) {
+    const properties = bookPropertiesCache[bookNumber] || [];
+    const property = properties.find(p => p.id === propertyId);
+    if (property) {
+        document.getElementById('editBookPropertyModalId').value = property.id;
+        document.getElementById('editBookPropertyModalBookNumber').value = bookNumber;
+        document.getElementById('editBookPropertyModalName').value = property.property_name;
+        document.getElementById('editBookPropertyModalValue').value = property.property_value;
+        document.getElementById('editBookPropertyModal').classList.add('show');
+    }
+}
+
+// Close edit book property modal
+function closeEditBookPropertyModal() {
+    document.getElementById('editBookPropertyModal').classList.remove('show');
+    document.getElementById('editBookPropertyForm').reset();
+}
+
+// Save edited book property from modal
+async function saveEditedBookProperty(event) {
+    event.preventDefault();
+
+    const propertyId = document.getElementById('editBookPropertyModalId').value;
+    const bookNumber = document.getElementById('editBookPropertyModalBookNumber').value;
+    const propertyName = document.getElementById('editBookPropertyModalName').value.trim();
+    const propertyValue = document.getElementById('editBookPropertyModalValue').value.trim();
+
+    if (!propertyName || !propertyValue) {
+        alert('Property name and value are required');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/books/properties/${propertyId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                property_name: propertyName,
+                property_value: propertyValue
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            closeEditBookPropertyModal();
+            loadBookProperties(bookNumber);
+        } else {
+            alert(data.error || 'Failed to update property');
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+}
+
+// Delete book property from modal
+async function deleteBookPropertyFromModal() {
+    const propertyId = document.getElementById('editBookPropertyModalId').value;
+    const bookNumber = document.getElementById('editBookPropertyModalBookNumber').value;
+
+    try {
+        const response = await fetch(`/api/books/properties/${propertyId}`, {
+            method: 'DELETE'
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            closeEditBookPropertyModal();
+            loadBookProperties(bookNumber);
+        } else {
+            alert(data.error || 'Failed to delete property');
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+}
+
+// Book property drag and drop handlers
+let draggedBookProperty = null;
+
+function handleBookPropertyDragStart(e) {
+    draggedBookProperty = this;
+    this.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+}
+
+function handleBookPropertyDragEnd(e) {
+    this.classList.remove('dragging');
+    document.querySelectorAll('.property-row').forEach(row => {
+        row.classList.remove('drag-over');
+    });
+}
+
+function handleBookPropertyDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+}
+
+function handleBookPropertyDragEnter(e) {
+    e.preventDefault();
+    if (this !== draggedBookProperty && this.dataset.bookNumber === draggedBookProperty.dataset.bookNumber) {
+        this.classList.add('drag-over');
+    }
+}
+
+function handleBookPropertyDragLeave(e) {
+    this.classList.remove('drag-over');
+}
+
+async function handleBookPropertyDrop(e) {
+    e.preventDefault();
+    this.classList.remove('drag-over');
+
+    if (this === draggedBookProperty) return;
+    if (this.dataset.bookNumber !== draggedBookProperty.dataset.bookNumber) return;
+
+    const bookNumber = this.dataset.bookNumber;
+    const container = this.parentNode;
+    const allRows = Array.from(container.querySelectorAll('.property-row'));
+
+    const fromIndex = allRows.indexOf(draggedBookProperty);
+    const toIndex = allRows.indexOf(this);
+
+    // Reorder in DOM
+    if (fromIndex < toIndex) {
+        container.insertBefore(draggedBookProperty, this.nextSibling);
+    } else {
+        container.insertBefore(draggedBookProperty, this);
+    }
+
+    // Get new order and save
+    const newOrder = Array.from(container.querySelectorAll('.property-row'))
+        .map(row => parseInt(row.dataset.propertyId));
+
+    await saveBookPropertyOrder(bookNumber, newOrder);
+}
+
+// Save book property order
+async function saveBookPropertyOrder(bookNumber, propertyIds) {
+    try {
+        const response = await fetch(`/api/books/${bookNumber}/properties/reorder`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ property_ids: propertyIds })
+        });
+
+        if (!response.ok) {
+            console.error('Failed to save property order');
+            loadBookProperties(bookNumber); // Reload to reset order
+        }
+    } catch (error) {
+        console.error('Error saving property order:', error);
+        loadBookProperties(bookNumber);
+    }
+}
+
 
 // Add a new book
 async function addBook() {
@@ -2194,8 +2656,8 @@ function setupAutocomplete() {
         items.forEach(item => {
             item.addEventListener('click', async function() {
                 const selectedTerm = this.getAttribute('data-value');
+                lastAutocompleteTerm = selectedTerm;  // Track selected term BEFORE setting value
                 input.value = selectedTerm;
-                lastAutocompleteTerm = selectedTerm;  // Track selected term
                 autocompleteList.classList.remove('show');
                 autocompleteList.innerHTML = '';
 
@@ -2212,7 +2674,8 @@ function setupAutocomplete() {
         if (lastAutocompleteTerm && input.value !== lastAutocompleteTerm) {
             // Term was modified after autocomplete selection - clear notes
             document.getElementById('notes').value = '';
-            lastAutocompleteTerm = '';  // Reset tracking
+            // Keep tracking - update to current value so we detect further changes
+            // but notes are already cleared so it won't matter
         }
     });
 
@@ -2234,8 +2697,8 @@ function setupAutocomplete() {
             if (autocompleteIndex >= 0) {
                 e.preventDefault();
                 const selectedTerm = items[autocompleteIndex].getAttribute('data-value');
+                lastAutocompleteTerm = selectedTerm;  // Track selected term BEFORE setting value
                 input.value = selectedTerm;
-                lastAutocompleteTerm = selectedTerm;  // Track selected term
                 autocompleteList.classList.remove('show');
                 autocompleteList.innerHTML = '';
                 autocompleteIndex = -1;
@@ -2445,6 +2908,8 @@ function handleGlobalKeyboardShortcuts(e) {
             closeHelpModal();
         } else if (document.getElementById('cliModal').classList.contains('show')) {
             closeCliModal();
+        } else if (document.getElementById('editBookPropertyModal').classList.contains('show')) {
+            closeEditBookPropertyModal();
         }
         return;
     }
@@ -2456,8 +2921,6 @@ function handleGlobalKeyboardShortcuts(e) {
         const activeTab = document.querySelector('.tab-content.active');
         if (activeTab && activeTab.id === 'tab-view') {
             document.getElementById('searchInput').focus();
-        } else if (activeTab && activeTab.id === 'tab-notes') {
-            document.getElementById('notesSearchInput').focus();
         } else if (activeTab && activeTab.id === 'tab-add') {
             document.getElementById('term').focus();
         }
@@ -2473,7 +2936,7 @@ function handleGlobalKeyboardShortcuts(e) {
     const tabMap = {
         '1': 'add',
         '2': 'view',
-        '3': 'notes',
+        '3': 'progress',
         '4': 'books',
         '5': 'tools',
         '6': 'settings'
@@ -2498,7 +2961,12 @@ function setupNumberOnlyFields() {
         document.getElementById('pageEnd'),
         document.getElementById('editPage'),
         document.getElementById('editPageEnd'),
-        document.getElementById('settingsIndexYear')
+        document.getElementById('settingsIndexYear'),
+        document.getElementById('newBookNumber'),
+        document.getElementById('editBookNumber'),
+        document.getElementById('addBookModalNumber'),
+        document.getElementById('createIndexBookNumber'),
+        document.getElementById('getStartedBookNumber')
     ];
 
     numberFields.forEach(field => {
@@ -2511,6 +2979,22 @@ function setupNumberOnlyFields() {
     });
 }
 
+// Progress chart instances (to destroy before re-rendering)
+let progressCharts = {
+    donut: null,
+    density: null,
+    stacked: null,
+    treemap: null
+};
+
+// Chart colors
+const chartColors = {
+    indexed: '#4ade80',    // Green
+    excluded: '#6b7280',   // Gray
+    gaps: '#ef4444',       // Red
+    primary: '#e94560'
+};
+
 // Run gap analysis
 async function runGapAnalysis() {
     const resultsContainer = document.getElementById('gapAnalysisResults');
@@ -2522,12 +3006,373 @@ async function runGapAnalysis() {
 
         if (response.ok) {
             displayGapAnalysis(data.results);
+            updateProgressCharts(data.results);
         } else {
             resultsContainer.innerHTML = `<p class="empty-state error">${data.error || 'Failed to run gap analysis'}</p>`;
         }
     } catch (error) {
         resultsContainer.innerHTML = `<p class="empty-state error">Error: ${error.message}</p>`;
     }
+}
+
+// Calculate book stats from gap analysis result
+function calculateBookStats(book) {
+    const pageCount = book.page_count || 0;
+    if (pageCount === 0) return { indexed: 0, excluded: 0, gaps: 0 };
+
+    // Count gap pages
+    let gapPages = 0;
+    (book.gaps || []).forEach(gap => {
+        if (gap.includes('-')) {
+            const [start, end] = gap.split('-').map(Number);
+            gapPages += end - start + 1;
+        } else {
+            gapPages += 1;
+        }
+    });
+
+    // Count excluded pages
+    let excludedPages = 0;
+    (book.excluded || []).forEach(exc => {
+        if (exc.includes('-')) {
+            const [start, end] = exc.split('-').map(Number);
+            excludedPages += end - start + 1;
+        } else {
+            excludedPages += 1;
+        }
+    });
+
+    const indexedPages = pageCount - gapPages - excludedPages;
+
+    return {
+        indexed: Math.max(0, indexedPages),
+        excluded: excludedPages,
+        gaps: gapPages
+    };
+}
+
+// Update progress charts
+function updateProgressCharts(results) {
+    // Update summary stats
+    updateProgressSummaryStats(results);
+
+    // Filter books with page counts for charts
+    const booksWithPages = results.filter(b => b.page_count > 0);
+
+    // Render charts
+    renderProgressDonutChart(booksWithPages);
+    renderProgressDensityChart(booksWithPages);
+    renderProgressStackedBarChart(booksWithPages);
+    renderProgressTreemapChart(booksWithPages);
+}
+
+// Update summary stats cards
+function updateProgressSummaryStats(results) {
+    const booksWithPages = results.filter(b => b.page_count > 0);
+    let totalPages = 0;
+    let totalIndexed = 0;
+
+    booksWithPages.forEach(book => {
+        const stats = calculateBookStats(book);
+        totalPages += book.page_count;
+        totalIndexed += stats.indexed + stats.excluded;
+    });
+
+    document.getElementById('statTotalBooks').textContent = results.length;
+    document.getElementById('statTotalPages').textContent = totalPages.toLocaleString();
+    document.getElementById('statIndexedPages').textContent = totalIndexed.toLocaleString();
+
+    const progress = totalPages > 0 ? Math.round((totalIndexed / totalPages) * 100) : 0;
+    document.getElementById('statOverallProgress').textContent = progress + '%';
+}
+
+// Render donut chart
+function renderProgressDonutChart(booksWithPages) {
+    // Destroy existing chart if any
+    if (progressCharts.donut) {
+        progressCharts.donut.destroy();
+    }
+
+    let totalIndexed = 0, totalExcluded = 0, totalGaps = 0;
+
+    booksWithPages.forEach(book => {
+        const stats = calculateBookStats(book);
+        totalIndexed += stats.indexed;
+        totalExcluded += stats.excluded;
+        totalGaps += stats.gaps;
+    });
+
+    const options = {
+        series: [totalIndexed, totalExcluded, totalGaps],
+        chart: {
+            type: 'donut',
+            height: 280,
+            background: 'transparent',
+            toolbar: { show: false }
+        },
+        labels: ['Indexed', 'Excluded', 'Gaps'],
+        colors: [chartColors.indexed, chartColors.excluded, chartColors.gaps],
+        legend: {
+            position: 'bottom',
+            labels: { colors: '#585858' }
+        },
+        plotOptions: {
+            pie: {
+                donut: {
+                    size: '65%',
+                    labels: {
+                        show: true,
+                        total: {
+                            show: true,
+                            label: 'Total Pages',
+                            color: '#585858',
+                            formatter: () => (totalIndexed + totalExcluded + totalGaps).toLocaleString()
+                        }
+                    }
+                }
+            }
+        },
+        dataLabels: {
+            enabled: true,
+            formatter: (val) => Math.round(val) + '%'
+        },
+        stroke: {
+            show: false
+        }
+    };
+
+    const container = document.getElementById('progressDonutChart');
+    if (container) {
+        progressCharts.donut = new ApexCharts(container, options);
+        progressCharts.donut.render();
+    }
+}
+
+// Render density chart
+function renderProgressDensityChart(booksWithPages) {
+    // Destroy existing chart if any
+    if (progressCharts.density) {
+        progressCharts.density.destroy();
+    }
+
+    // Store full labels for tooltips
+    const fullLabels = booksWithPages.map(b => `Book ${b.book_number}: ${b.book_name}`);
+
+    // Use book number only for display
+    const categories = booksWithPages.map(b => `Book ${b.book_number}`);
+
+    const densities = booksWithPages.map(b => {
+        const density = (b.term_count / b.page_count) * 100;
+        return Math.round(density * 10) / 10;
+    });
+
+    const options = {
+        series: [{
+            name: 'Terms per 100 pages',
+            data: densities
+        }],
+        chart: {
+            type: 'bar',
+            height: 280,
+            background: 'transparent',
+            toolbar: { show: false }
+        },
+        plotOptions: {
+            bar: {
+                horizontal: true,
+                borderRadius: 4
+            }
+        },
+        colors: [chartColors.primary],
+        xaxis: {
+            categories: categories,
+            title: { text: 'Terms per 100 pages', style: { color: '#585858' } },
+            labels: { style: { colors: '#585858' } }
+        },
+        yaxis: {
+            labels: { style: { colors: '#585858' } }
+        },
+        dataLabels: {
+            enabled: true,
+            formatter: (val) => val.toFixed(1),
+            style: { colors: ['#fff'] }
+        },
+        tooltip: {
+            custom: function({ series, seriesIndex, dataPointIndex, w }) {
+                const value = series[seriesIndex][dataPointIndex];
+                const fullLabel = fullLabels[dataPointIndex];
+                return '<div style="padding: 8px 12px; background: #fff; border: 1px solid #e5e7eb; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">' +
+                    '<div style="font-weight: 600; color: #585858; margin-bottom: 4px;">' + fullLabel + '</div>' +
+                    '<div style="color: #e94560;">' + value.toFixed(1) + ' terms per 100 pages</div>' +
+                    '</div>';
+            }
+        },
+        grid: {
+            borderColor: '#e5e7eb'
+        }
+    };
+
+    const container = document.getElementById('progressDensityChart');
+    if (container) {
+        progressCharts.density = new ApexCharts(container, options);
+        progressCharts.density.render();
+    }
+}
+
+// Render stacked bar chart
+function renderProgressStackedBarChart(booksWithPages) {
+    // Destroy existing chart if any
+    if (progressCharts.stacked) {
+        progressCharts.stacked.destroy();
+    }
+
+    // Store full labels for tooltips
+    const fullLabels = booksWithPages.map(b => `Book ${b.book_number}: ${b.book_name}`);
+
+    // Use book number only for display
+    const categories = booksWithPages.map(b => `Book ${b.book_number}`);
+
+    const indexedData = [];
+    const excludedData = [];
+    const gapsData = [];
+
+    booksWithPages.forEach(book => {
+        const stats = calculateBookStats(book);
+        indexedData.push(stats.indexed);
+        excludedData.push(stats.excluded);
+        gapsData.push(stats.gaps);
+    });
+
+    const options = {
+        series: [
+            { name: 'Indexed', data: indexedData },
+            { name: 'Excluded', data: excludedData },
+            { name: 'Gaps', data: gapsData }
+        ],
+        chart: {
+            type: 'bar',
+            height: 280,
+            stacked: true,
+            stackType: '100%',
+            background: 'transparent',
+            toolbar: { show: false }
+        },
+        plotOptions: {
+            bar: {
+                horizontal: true,
+                borderRadius: 4
+            }
+        },
+        colors: [chartColors.indexed, chartColors.excluded, chartColors.gaps],
+        xaxis: {
+            categories: categories,
+            labels: { style: { colors: '#585858' } }
+        },
+        yaxis: {
+            labels: { style: { colors: '#585858' } }
+        },
+        legend: {
+            position: 'top',
+            labels: { colors: '#585858' }
+        },
+        tooltip: {
+            custom: function({ series, seriesIndex, dataPointIndex, w }) {
+                const fullLabel = fullLabels[dataPointIndex];
+                const indexed = indexedData[dataPointIndex];
+                const excluded = excludedData[dataPointIndex];
+                const gaps = gapsData[dataPointIndex];
+                return '<div style="padding: 8px 12px; background: #fff; border: 1px solid #e5e7eb; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">' +
+                    '<div style="font-weight: 600; color: #585858; margin-bottom: 4px;">' + fullLabel + '</div>' +
+                    '<div style="color: #4ade80;">Indexed: ' + indexed + ' pages</div>' +
+                    '<div style="color: #6b7280;">Excluded: ' + excluded + ' pages</div>' +
+                    '<div style="color: #ef4444;">Gaps: ' + gaps + ' pages</div>' +
+                    '</div>';
+            }
+        },
+        grid: {
+            borderColor: '#e5e7eb'
+        }
+    };
+
+    const container = document.getElementById('progressStackedBarChart');
+    if (container) {
+        progressCharts.stacked = new ApexCharts(container, options);
+        progressCharts.stacked.render();
+    }
+}
+
+// Render treemap chart for gap distribution
+function renderProgressTreemapChart(booksWithPages) {
+    // Destroy existing chart if any
+    if (progressCharts.treemap) {
+        progressCharts.treemap.destroy();
+    }
+
+    const container = document.getElementById('progressTreemapChart');
+    if (!container) return;
+
+    // Store full labels for tooltips
+    const fullLabels = {};
+    booksWithPages.forEach(book => {
+        fullLabels[`Book ${book.book_number}`] = `Book ${book.book_number}: ${book.book_name}`;
+    });
+
+    const data = booksWithPages.map(book => {
+        const stats = calculateBookStats(book);
+        return {
+            x: `Book ${book.book_number}`,
+            y: stats.gaps
+        };
+    }).filter(d => d.y > 0); // Only show books with gaps
+
+    if (data.length === 0) {
+        container.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100%;color:#585858;font-size:0.95rem;">No gaps to display - all pages indexed!</div>';
+        return;
+    }
+
+    const options = {
+        series: [{
+            data: data
+        }],
+        chart: {
+            type: 'treemap',
+            height: 280,
+            background: 'transparent',
+            toolbar: { show: false }
+        },
+        colors: [chartColors.gaps],
+        plotOptions: {
+            treemap: {
+                distributed: false,
+                enableShades: true,
+                shadeIntensity: 0.5
+            }
+        },
+        dataLabels: {
+            enabled: true,
+            formatter: (text, op) => {
+                return [text, op.value + ' pages'];
+            },
+            style: {
+                fontSize: '12px'
+            }
+        },
+        tooltip: {
+            custom: function({ series, seriesIndex, dataPointIndex, w }) {
+                const dataPoint = w.config.series[seriesIndex].data[dataPointIndex];
+                const bookKey = dataPoint.x;
+                const fullLabel = fullLabels[bookKey] || bookKey;
+                const value = dataPoint.y;
+                return '<div style="padding: 8px 12px; background: #fff; border: 1px solid #e5e7eb; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">' +
+                    '<div style="font-weight: 600; color: #585858; margin-bottom: 4px;">' + fullLabel + '</div>' +
+                    '<div style="color: #ef4444;">' + value + ' gap pages</div>' +
+                    '</div>';
+            }
+        }
+    };
+
+    progressCharts.treemap = new ApexCharts(container, options);
+    progressCharts.treemap.render();
 }
 
 // Display gap analysis results
@@ -2543,6 +3388,28 @@ function displayGapAnalysis(results) {
 
     results.forEach(result => {
         const totalPages = result.page_count;
+
+        html += `<div class="gap-book">`;
+        html += `<div class="gap-book-header" onclick="toggleGapBookExpand('${escapeHtml(result.book_number)}')">`;
+        html += `<div class="gap-book-info">`;
+        html += `<span class="gap-expand-icon" id="gapExpandIcon_${result.book_number}">▶</span>`;
+        html += `<h3>Book ${escapeHtml(result.book_number)}: ${escapeHtml(result.book_name)}</h3>`;
+        html += `</div>`;
+
+        // Check if page count is set
+        if (!totalPages || totalPages === 0) {
+            html += `<span class="gap-header-status gap-header-warning">No page count</span>`;
+            html += `</div>`; // Close gap-book-header
+            html += `<div class="gap-book-details" id="gapDetails_${result.book_number}" style="display: none;">`;
+            html += `<div class="gap-no-pagecount">`;
+            html += `<p>A page count must be set for gap analysis to be performed on this book.</p>`;
+            html += `<p><a href="#" onclick="switchTab('books'); return false;">Set page count in Books</a></p>`;
+            html += `</div>`;
+            html += `</div>`; // Close gap-book-details
+            html += `</div>`; // Close gap-book
+            return;
+        }
+
         const gapsCount = result.gaps.length;
 
         // Calculate gap pages
@@ -2566,14 +3433,26 @@ function displayGapAnalysis(results) {
         const coveredPages = totalPages - gapPages;
         const coveragePercent = totalPages > 0 ? ((coveredPages / totalPages) * 100).toFixed(1) : 0;
 
+        // Show coverage status in header
+        if (gapsCount === 0) {
+            html += `<span class="gap-header-status gap-header-complete">${coveragePercent}% Complete</span>`;
+        } else {
+            html += `<span class="gap-header-status">${coveragePercent}% Coverage</span>`;
+        }
+        html += `</div>`; // Close gap-book-header
+
+        // Collapsible details section
+        html += `<div class="gap-book-details" id="gapDetails_${result.book_number}" style="display: none;">`;
+
         const exclusionCount = (result.excluded || []).length;
 
-        html += `<div class="gap-book">`;
-        html += `<div class="gap-book-header">`;
-        html += `<h3>Book ${escapeHtml(result.book_number)}: ${escapeHtml(result.book_name)}</h3>`;
+        // Calculate term density (terms per 100 pages)
+        const termDensity = totalPages > 0 ? ((result.term_count || 0) / totalPages * 100).toFixed(1) : 0;
+
         html += `<div class="gap-stats">`;
         html += `<span class="gap-stat">Total Pages: ${totalPages}</span>`;
         html += `<span class="gap-stat">Indexed Terms: ${result.term_count || 0}</span>`;
+        html += `<span class="gap-stat">Term Density: ${termDensity}/100pg</span>`;
         html += `<span class="gap-stat">Coverage: ${coveragePercent}%</span>`;
         html += `<span class="gap-stat">Gap Ranges: ${gapsCount}</span>`;
         if (exclusionCount > 0) {
@@ -2582,7 +3461,6 @@ function displayGapAnalysis(results) {
         if (excludedPages > 0) {
             html += `<span class="gap-stat">Excluded Pages: ${excludedPages}</span>`;
         }
-        html += `</div>`;
         html += `</div>`;
 
         if (result.gaps.length === 0 && (result.excluded || []).length === 0) {
@@ -2607,11 +3485,26 @@ function displayGapAnalysis(results) {
             }
         }
 
-        html += `</div>`;
+        html += `</div>`; // Close gap-book-details
+        html += `</div>`; // Close gap-book
     });
 
     html += '</div>';
     container.innerHTML = html;
+}
+
+// Toggle gap book expand/collapse
+function toggleGapBookExpand(bookNumber) {
+    const details = document.getElementById(`gapDetails_${bookNumber}`);
+    const icon = document.getElementById(`gapExpandIcon_${bookNumber}`);
+
+    if (details.style.display === 'none') {
+        details.style.display = 'block';
+        icon.textContent = '▼';
+    } else {
+        details.style.display = 'none';
+        icon.textContent = '▶';
+    }
 }
 
 // Store current gap action context
@@ -2770,6 +3663,591 @@ async function confirmReinclude() {
 
 
 // ===================================
+// AI Term Enrichment Functions
+// ===================================
+
+// Load AI enrichment settings
+async function loadAiEnrichment() {
+    try {
+        const response = await fetch('/api/ai/settings');
+        const data = await response.json();
+
+        const checkbox = document.getElementById('enableAiFeatures');
+        const hint = document.getElementById('enableAiHint');
+        const enrichBtn = document.getElementById('enrichApiBtn');
+
+        checkbox.checked = data.enabled;
+        document.getElementById('aiProvider').value = data.provider || '';
+        // Don't populate the API key field for security - just show placeholder
+        document.getElementById('aiApiKey').placeholder = data.has_key ? '••••••••••••••••' : 'Enter your API key';
+
+        // Enable checkbox only if API key is configured
+        if (data.has_key) {
+            checkbox.disabled = false;
+            hint.style.display = 'none';
+        } else {
+            checkbox.disabled = true;
+            checkbox.checked = false;
+            hint.style.display = 'block';
+        }
+
+        // Show enrich button if enabled and API key is configured
+        if (data.enabled && data.has_key) {
+            enrichBtn.style.display = 'inline-block';
+        } else {
+            enrichBtn.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Error loading AI settings:', error);
+    }
+}
+
+// Save AI settings
+async function saveAiSettings() {
+    const provider = document.getElementById('aiProvider').value;
+    const apiKey = document.getElementById('aiApiKey').value;
+    const enabled = document.getElementById('enableAiFeatures').checked;
+    const messageDiv = document.getElementById('aiSettingsMessage');
+
+    try {
+        const response = await fetch('/api/ai/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                enabled: enabled,
+                provider: provider,
+                api_key: apiKey || null
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            messageDiv.className = 'message success show';
+            messageDiv.textContent = 'AI settings saved successfully';
+
+            // If API key was provided, enable the checkbox
+            if (apiKey) {
+                document.getElementById('aiApiKey').value = '';
+                document.getElementById('aiApiKey').placeholder = '••••••••••••••••';
+                document.getElementById('enableAiFeatures').disabled = false;
+                document.getElementById('enableAiHint').style.display = 'none';
+            }
+
+            // Show the enrich button only if enabled
+            if (enabled) {
+                document.getElementById('enrichApiBtn').style.display = 'inline-block';
+            }
+
+            setTimeout(() => {
+                messageDiv.className = 'message';
+                messageDiv.textContent = '';
+            }, 3000);
+        } else {
+            messageDiv.className = 'message error show';
+            messageDiv.textContent = data.error || 'Failed to save settings';
+        }
+    } catch (error) {
+        messageDiv.className = 'message error show';
+        messageDiv.textContent = 'Error: ' + error.message;
+    }
+}
+
+// Validate AI API key
+async function validateAiApiKey() {
+    const provider = document.getElementById('aiProvider').value;
+    const apiKey = document.getElementById('aiApiKey').value;
+    const btn = document.getElementById('validateKeyBtn');
+    const statusEl = document.getElementById('apiKeyValidationStatus');
+
+    if (!provider) {
+        statusEl.textContent = 'Please select an AI Provider first';
+        statusEl.style.display = 'block';
+        statusEl.style.color = 'var(--warning-color, #f59e0b)';
+        return;
+    }
+
+    if (!apiKey) {
+        statusEl.textContent = 'Please enter an API key';
+        statusEl.style.display = 'block';
+        statusEl.style.color = 'var(--warning-color, #f59e0b)';
+        return;
+    }
+
+    const originalText = btn.textContent;
+    btn.textContent = 'Validating...';
+    btn.disabled = true;
+    statusEl.style.display = 'none';
+
+    try {
+        const response = await fetch('/api/ai/validate-key', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                provider: provider,
+                api_key: apiKey
+            })
+        });
+
+        const data = await response.json();
+
+        statusEl.style.display = 'block';
+        if (data.valid) {
+            statusEl.textContent = 'API key is valid';
+            statusEl.style.color = 'var(--success-color, #10b981)';
+        } else {
+            statusEl.textContent = data.message || 'Invalid API key';
+            statusEl.style.color = 'var(--error-color, #ef4444)';
+        }
+    } catch (error) {
+        statusEl.style.display = 'block';
+        statusEl.textContent = 'Validation failed: ' + error.message;
+        statusEl.style.color = 'var(--error-color, #ef4444)';
+    } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+}
+
+// Clear API key from database
+async function clearAiApiKey() {
+    const messageDiv = document.getElementById('aiSettingsMessage');
+
+    try {
+        const response = await fetch('/api/ai/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                enabled: false,  // Disable AI features when clearing key
+                provider: document.getElementById('aiProvider').value,
+                api_key: '',
+                clear_key: true
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            messageDiv.className = 'message success show';
+            messageDiv.textContent = 'API key cleared';
+            document.getElementById('aiApiKey').value = '';
+            document.getElementById('aiApiKey').placeholder = 'Enter your API key';
+            document.getElementById('enableAiFeatures').checked = false;
+            document.getElementById('enableAiFeatures').disabled = true;
+            document.getElementById('enableAiHint').style.display = 'block';
+            document.getElementById('enrichApiBtn').style.display = 'none';
+
+            setTimeout(() => {
+                messageDiv.className = 'message';
+                messageDiv.textContent = '';
+            }, 3000);
+        } else {
+            messageDiv.className = 'message error show';
+            messageDiv.textContent = data.error || 'Failed to clear API key';
+        }
+    } catch (error) {
+        messageDiv.className = 'message error show';
+        messageDiv.textContent = 'Error: ' + error.message;
+    }
+}
+
+// Copy AI prompt to clipboard for manual workflow
+async function copyAiPrompt() {
+    const messageDiv = document.getElementById('aiMessage');
+
+    try {
+        // Get the selected AI provider from settings
+        const provider = document.getElementById('aiProvider').value;
+
+        if (!provider) {
+            messageDiv.className = 'message warning show';
+            messageDiv.textContent = 'Please select an AI Provider in the Settings tab first.';
+            setTimeout(() => {
+                messageDiv.className = 'message';
+                messageDiv.textContent = '';
+            }, 5000);
+            return;
+        }
+
+        // Load prompts from API
+        const promptsResponse = await fetch('/api/ai/prompts');
+        const promptsData = await promptsResponse.json();
+
+        if (!promptsData.prompts[provider]) {
+            messageDiv.className = 'message error show';
+            messageDiv.textContent = 'No prompt configured for this provider.';
+            return;
+        }
+
+        // Get terms without notes from the API
+        const termsResponse = await fetch('/api/ai/terms?without_notes=true');
+        const termsData = await termsResponse.json();
+
+        if (!termsData.terms || termsData.terms.length === 0) {
+            messageDiv.className = 'message warning show';
+            messageDiv.textContent = 'No terms without notes to enrich. All terms already have notes.';
+            setTimeout(() => {
+                messageDiv.className = 'message';
+                messageDiv.textContent = '';
+            }, 3000);
+            return;
+        }
+
+        // Build the term list
+        const termPrefix = promptsData.term_prefix || '- ';
+        const termSeparator = promptsData.term_list_separator || '\n';
+        const termList = termsData.terms.map(t => termPrefix + t.term).join(termSeparator);
+
+        // Get index name for $course_title replacement
+        const indexName = document.getElementById('indexName').textContent || 'Untitled Index';
+
+        // Get model from prompts config
+        const model = promptsData.prompts[provider].model || '';
+
+        // Combine the prompt with the term list, replacing placeholders
+        let promptTemplate = promptsData.prompts[provider].prompt;
+        promptTemplate = promptTemplate.replace(/\$course_title/g, indexName);
+        promptTemplate = promptTemplate.replace(/\$model/g, model);
+        const fullPrompt = promptTemplate + '\n' + termList;
+
+        // Copy to clipboard
+        await navigator.clipboard.writeText(fullPrompt);
+
+        const providerName = promptsData.prompts[provider].name;
+        messageDiv.className = 'message success show';
+        messageDiv.textContent = `Copied ${providerName} prompt with ${termsData.terms.length} terms to clipboard.`;
+        setTimeout(() => {
+            messageDiv.className = 'message';
+            messageDiv.textContent = '';
+        }, 5000);
+    } catch (error) {
+        messageDiv.className = 'message error show';
+        messageDiv.textContent = 'Error copying prompt: ' + error.message;
+    }
+}
+
+// Enrich terms using API
+async function enrichTermsWithApi() {
+    const btn = document.getElementById('enrichApiBtn');
+    const messageDiv = document.getElementById('aiMessage');
+    const originalText = btn.textContent;
+    btn.textContent = 'Enriching...';
+    btn.disabled = true;
+
+    try {
+        const response = await fetch('/api/ai/enrich', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({})
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            messageDiv.className = 'message success show';
+            messageDiv.textContent = data.message;
+            setTimeout(() => {
+                messageDiv.className = 'message';
+                messageDiv.textContent = '';
+            }, 5000);
+        } else {
+            messageDiv.className = 'message error show';
+            messageDiv.textContent = data.error || 'Failed to enrich terms';
+        }
+    } catch (error) {
+        messageDiv.className = 'message error show';
+        messageDiv.textContent = 'Error: ' + error.message;
+    } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+}
+
+
+// ===================================
+// Study Mode Functions
+// ===================================
+
+let studyCards = [];
+let currentCardIndex = 0;
+
+// Initialize study mode filter dropdown
+function initStudyMode() {
+    const filterSelect = document.getElementById('studyFilter');
+    const bookFilterDiv = document.getElementById('studyBookFilter');
+    const bookSelect = document.getElementById('studyBookSelect');
+
+    filterSelect.addEventListener('change', async function() {
+        if (this.value === 'book') {
+            bookFilterDiv.style.display = 'block';
+            // Populate book dropdown
+            try {
+                const response = await fetch('/api/books');
+                const data = await response.json();
+                bookSelect.innerHTML = '';
+                data.books.forEach(book => {
+                    const option = document.createElement('option');
+                    option.value = book.book_number;
+                    option.textContent = `Book ${book.book_number}: ${book.book_name}`;
+                    bookSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading books:', error);
+            }
+        } else {
+            bookFilterDiv.style.display = 'none';
+        }
+    });
+}
+
+// Start study session
+async function startStudyMode() {
+    const filterType = document.getElementById('studyFilter').value;
+    const shuffle = document.getElementById('studyShuffle').checked;
+
+    try {
+        // Fetch terms with notes
+        const response = await fetch('/api/notes');
+        const data = await response.json();
+
+        if (!data.notes || data.notes.length === 0) {
+            alert('No terms with notes found. Add notes to your terms first.');
+            return;
+        }
+
+        // Filter cards based on selection
+        let cards = data.notes;
+
+        if (filterType === 'book') {
+            const bookNumber = document.getElementById('studyBookSelect').value;
+            // Need to fetch entries to filter by book
+            const entriesResponse = await fetch('/api/entries');
+            const entriesData = await entriesResponse.json();
+
+            // Get terms that have references in the selected book
+            const termsInBook = new Set();
+            entriesData.entries.forEach(entry => {
+                if (entry.references) {
+                    entry.references.forEach(ref => {
+                        if (ref.startsWith(bookNumber + ':')) {
+                            termsInBook.add(entry.term.toLowerCase());
+                        }
+                    });
+                }
+            });
+
+            cards = cards.filter(card => termsInBook.has(card.term.toLowerCase()));
+
+            if (cards.length === 0) {
+                alert('No terms with notes found for the selected book.');
+                return;
+            }
+        }
+
+        // Shuffle if enabled
+        if (shuffle) {
+            cards = shuffleArray([...cards]);
+        }
+
+        studyCards = cards;
+        currentCardIndex = 0;
+
+        // Fetch references for all terms
+        const entriesResponse = await fetch('/api/entries');
+        const entriesData = await entriesResponse.json();
+        const refsMap = {};
+        entriesData.entries.forEach(entry => {
+            refsMap[entry.term.toLowerCase()] = entry.references || [];
+        });
+
+        // Add references to cards
+        studyCards = studyCards.map(card => ({
+            ...card,
+            references: refsMap[card.term.toLowerCase()] || []
+        }));
+
+        // Show study overlay
+        document.getElementById('studyOverlay').classList.add('active');
+        document.body.style.overflow = 'hidden'; // Prevent scrolling
+        document.addEventListener('keydown', handleStudyKeyboard);
+
+        showCurrentCard();
+    } catch (error) {
+        console.error('Error starting study mode:', error);
+        alert('Error starting study session: ' + error.message);
+    }
+}
+
+// Keyboard handler for study mode
+function handleStudyKeyboard(e) {
+    // Don't handle if study overlay is not active
+    if (!document.getElementById('studyOverlay').classList.contains('active')) return;
+
+    // Don't handle if typing in an input field
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+    switch (e.key.toLowerCase()) {
+        case 'n':
+            nextFlashcard();
+            break;
+        case 'p':
+            prevFlashcard();
+            break;
+        case ' ':  // Spacebar to flip
+            e.preventDefault();
+            flipFlashcard();
+            break;
+        case 'escape':
+            endStudyMode();
+            break;
+        case 'enter':
+            // Prevent Enter from activating focused buttons
+            e.preventDefault();
+            break;
+    }
+}
+
+// End study session
+function endStudyMode() {
+    document.getElementById('studyOverlay').classList.remove('active');
+    document.body.style.overflow = ''; // Restore scrolling
+    document.removeEventListener('keydown', handleStudyKeyboard);
+    resetStudyOverlay();
+    studyCards = [];
+    currentCardIndex = 0;
+}
+
+// Reset study overlay to initial state
+function resetStudyOverlay() {
+    const container = document.querySelector('.study-session-container');
+    container.innerHTML = `
+        <div class="study-header">
+            <div class="study-progress">
+                <span id="studyProgress">0 / 0</span>
+            </div>
+            <button type="button" class="btn-end-session" onclick="endStudyMode()" title="End Session">&times;</button>
+        </div>
+
+        <div class="flashcard-wrapper">
+            <div class="flashcard" id="flashcard" onclick="flipFlashcard()">
+                <div class="flashcard-inner" id="flashcardInner">
+                    <div class="flashcard-front">
+                        <div class="flashcard-term" id="flashcardTerm"></div>
+                        <div class="flashcard-hint">Click to reveal</div>
+                    </div>
+                    <div class="flashcard-back">
+                        <div class="flashcard-term" id="flashcardTermBack"></div>
+                        <div class="flashcard-notes" id="flashcardNotes"></div>
+                        <div class="flashcard-refs" id="flashcardRefs"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="study-controls">
+            <button type="button" class="btn btn-secondary" onclick="prevFlashcard()" id="prevCardBtn">Previous</button>
+            <button type="button" class="btn btn-primary" onclick="nextFlashcard()" id="nextCardBtn">Next</button>
+        </div>
+    `;
+}
+
+// Show current flashcard
+function showCurrentCard() {
+    if (studyCards.length === 0) return;
+
+    const card = studyCards[currentCardIndex];
+    const flashcard = document.getElementById('flashcard');
+
+    // Reset flip state
+    flashcard.classList.remove('flipped');
+
+    // Update card content
+    document.getElementById('flashcardTerm').textContent = card.term;
+    document.getElementById('flashcardTermBack').textContent = card.term;
+    document.getElementById('flashcardNotes').textContent = card.notes;
+
+    // Show references if available
+    const refsEl = document.getElementById('flashcardRefs');
+    if (card.references && card.references.length > 0) {
+        refsEl.textContent = 'References: ' + card.references.join(', ');
+    } else {
+        refsEl.textContent = '';
+    }
+
+    // Update progress
+    document.getElementById('studyProgress').textContent = `${currentCardIndex + 1} / ${studyCards.length}`;
+
+    // Update button states
+    document.getElementById('prevCardBtn').disabled = currentCardIndex === 0;
+    document.getElementById('nextCardBtn').textContent = currentCardIndex === studyCards.length - 1 ? 'Finish' : 'Next';
+}
+
+// Flip flashcard
+function flipFlashcard() {
+    const flashcard = document.getElementById('flashcard');
+    flashcard.classList.toggle('flipped');
+}
+
+// Previous flashcard
+function prevFlashcard() {
+    if (currentCardIndex > 0) {
+        currentCardIndex--;
+        showCurrentCard();
+    }
+}
+
+// Next flashcard
+function nextFlashcard() {
+    if (currentCardIndex < studyCards.length - 1) {
+        currentCardIndex++;
+        showCurrentCard();
+    } else {
+        // Study session complete
+        showStudyComplete();
+    }
+}
+
+// Show study complete screen
+function showStudyComplete() {
+    const container = document.querySelector('.study-session-container');
+    container.innerHTML = `
+        <div class="study-complete">
+            <h3>Session Complete!</h3>
+            <p>You reviewed ${studyCards.length} cards.</p>
+            <div style="display: flex; gap: 1rem; justify-content: center;">
+                <button type="button" class="btn btn-secondary" onclick="restartStudySession()">Study Again</button>
+                <button type="button" class="btn btn-primary" onclick="endStudyMode()">Done</button>
+            </div>
+        </div>
+    `;
+}
+
+// Restart study session with same cards
+function restartStudySession() {
+    const shuffle = document.getElementById('studyShuffle').checked;
+    if (shuffle) {
+        studyCards = shuffleArray([...studyCards]);
+    }
+    currentCardIndex = 0;
+
+    // Restore session UI
+    resetStudyOverlay();
+    showCurrentCard();
+}
+
+// Shuffle array (Fisher-Yates algorithm)
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
+
+// ===================================
 // Database Management Functions
 // ===================================
 
@@ -2811,6 +4289,12 @@ async function showDatabaseSwitcher() {
             listDiv.appendChild(ul);
         }
 
+        // Add "Create new index" link at the bottom
+        const createLink = document.createElement('div');
+        createLink.className = 'database-switcher-create';
+        createLink.innerHTML = '<a href="#" onclick="showCreateIndexModal(); return false;">+ Create new index</a>';
+        listDiv.appendChild(createLink);
+
         switcher.style.display = 'block';
     } catch (error) {
         console.error('Error loading databases:', error);
@@ -2843,6 +4327,70 @@ async function switchDatabase(dbName) {
     } catch (error) {
         console.error('Error switching database:', error);
         showColorSchemeMessage('Error switching database', 'error');
+    }
+}
+
+// Show create index modal
+function showCreateIndexModal() {
+    document.getElementById('databaseSwitcher').style.display = 'none';
+    document.getElementById('createIndexModal').classList.add('show');
+    document.getElementById('createIndexForm').reset();
+    document.getElementById('createIndexBookNumber').value = '1';
+    document.getElementById('createIndexMessage').className = 'message';
+    document.getElementById('createIndexMessage').textContent = '';
+    document.getElementById('createIndexName').focus();
+}
+
+// Close create index modal
+function closeCreateIndexModal() {
+    document.getElementById('createIndexModal').classList.remove('show');
+}
+
+// Submit create index form
+async function submitCreateIndex(event) {
+    event.preventDefault();
+
+    const indexName = document.getElementById('createIndexName').value.trim();
+    const bookName = document.getElementById('createIndexBookName').value.trim();
+    const bookNumber = document.getElementById('createIndexBookNumber').value.trim();
+    const bookPages = document.getElementById('createIndexBookPages').value.trim();
+    const messageDiv = document.getElementById('createIndexMessage');
+
+    if (!indexName || !bookName || !bookNumber) {
+        messageDiv.className = 'message error show';
+        messageDiv.textContent = 'Please fill in all required fields';
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/databases/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                index_name: indexName,
+                book_name: bookName,
+                book_number: bookNumber,
+                book_pages: bookPages || null
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            messageDiv.className = 'message success show';
+            messageDiv.textContent = 'Index created successfully!';
+
+            setTimeout(() => {
+                closeCreateIndexModal();
+                window.location.reload();
+            }, 1000);
+        } else {
+            messageDiv.className = 'message error show';
+            messageDiv.textContent = data.error || 'Failed to create index';
+        }
+    } catch (error) {
+        messageDiv.className = 'message error show';
+        messageDiv.textContent = 'Error: ' + error.message;
     }
 }
 
@@ -2941,7 +4489,17 @@ function closeCreateDatabaseModal() {
 // Check if this is a new/empty database that needs setup
 async function checkNeedsSetup() {
     try {
-        // Check settings, books, and entries to determine if setup is needed
+        // First check if any database exists at all
+        const setupRes = await fetch('/api/needs-setup');
+        const setupData = await setupRes.json();
+
+        if (setupData.needs_setup) {
+            // No database exists - show Get Started modal
+            showGetStartedModal();
+            return;
+        }
+
+        // Database exists - check if it's still in default state
         const [settingsRes, booksRes, entriesRes] = await Promise.all([
             fetch('/api/settings'),
             fetch('/api/books'),
@@ -2978,6 +4536,10 @@ function closeGetStartedModal() {
     document.getElementById('getStartedModal').classList.remove('show');
     document.getElementById('getStartedForm').reset();
     document.getElementById('getStartedMessage').innerHTML = '';
+
+    // Hide all sections and remove active states
+    document.querySelectorAll('.get-started-section').forEach(s => s.classList.remove('show'));
+    document.querySelectorAll('.get-started-btn').forEach(b => b.classList.remove('active'));
 }
 
 // Handle Get Started form submission
@@ -2997,22 +4559,42 @@ async function handleGetStarted(event) {
     }
 
     try {
-        // Update the index name
-        const settingsResponse = await fetch('/api/settings', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ index_name: indexName })
-        });
+        // Check if we need to create a new database first
+        const setupRes = await fetch('/api/needs-setup');
+        const setupData = await setupRes.json();
 
-        if (!settingsResponse.ok) {
-            const settingsData = await settingsResponse.json();
-            messageDiv.className = 'message error show';
-            messageDiv.textContent = settingsData.error || 'Failed to save index name';
-            return;
+        if (setupData.needs_setup) {
+            // Create the database first
+            const createResponse = await fetch('/api/databases/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ index_name: indexName })
+            });
+
+            if (!createResponse.ok) {
+                const createData = await createResponse.json();
+                messageDiv.className = 'message error show';
+                messageDiv.textContent = createData.error || 'Failed to create index';
+                return;
+            }
+        } else {
+            // Database exists, just update the index name
+            const settingsResponse = await fetch('/api/settings/index-name', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: indexName })
+            });
+
+            if (!settingsResponse.ok) {
+                const settingsData = await settingsResponse.json();
+                messageDiv.className = 'message error show';
+                messageDiv.textContent = settingsData.error || 'Failed to save index name';
+                return;
+            }
         }
 
         // Add the first book
-        const bookResponse = await fetch('/api/books', {
+        const bookResponse = await fetch('/api/books/add', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -3025,7 +4607,7 @@ async function handleGetStarted(event) {
         if (!bookResponse.ok) {
             const bookData = await bookResponse.json();
             messageDiv.className = 'message warning show';
-            messageDiv.textContent = 'Index name saved but failed to add book: ' + (bookData.error || 'Unknown error');
+            messageDiv.textContent = 'Index created but failed to add book: ' + (bookData.error || 'Unknown error');
             return;
         }
 
@@ -3041,6 +4623,66 @@ async function handleGetStarted(event) {
 
     } catch (error) {
         console.error('Error in Get Started:', error);
+        messageDiv.className = 'message error show';
+        messageDiv.textContent = 'An error occurred. Please try again.';
+    }
+}
+
+// Toggle Get Started sections
+function toggleGetStartedSection(section) {
+    const sections = {
+        create: document.getElementById('getStartedCreateSection'),
+        import: document.getElementById('getStartedImportSection'),
+        demo: document.getElementById('getStartedDemoSection')
+    };
+
+    const buttons = document.querySelectorAll('.get-started-btn');
+
+    // Check if this section is already open
+    const isOpen = sections[section].classList.contains('show');
+
+    // Close all sections and remove active state from buttons
+    Object.values(sections).forEach(s => s.classList.remove('show'));
+    buttons.forEach(b => b.classList.remove('active'));
+
+    // If it wasn't open, open it
+    if (!isOpen) {
+        sections[section].classList.add('show');
+        // Find and activate the corresponding button
+        const btn = sections[section].previousElementSibling;
+        if (btn) btn.classList.add('active');
+    }
+}
+
+// Load demo index
+async function loadDemoIndex() {
+    const messageDiv = document.getElementById('getStartedMessage');
+
+    try {
+        messageDiv.className = 'message show';
+        messageDiv.textContent = 'Loading demo index...';
+
+        const response = await fetch('/api/databases/load-demo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            messageDiv.className = 'message success show';
+            messageDiv.textContent = 'Demo index loaded!';
+
+            setTimeout(() => {
+                closeGetStartedModal();
+                window.location.reload();
+            }, 1000);
+        } else {
+            messageDiv.className = 'message error show';
+            messageDiv.textContent = data.error || 'Failed to load demo index';
+        }
+    } catch (error) {
+        console.error('Error loading demo:', error);
         messageDiv.className = 'message error show';
         messageDiv.textContent = 'An error occurred. Please try again.';
     }

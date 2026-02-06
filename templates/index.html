@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Index it!</title>
-    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 </head>
 <body>
     <div id="wrapper">
@@ -45,8 +47,8 @@
         <div style="text-align: center;">
             <div class="tabs">
                 <button class="tab-button active" onclick="switchTab('add')"><span>Add Entry</span></button>
-                <button class="tab-button" onclick="switchTab('view')"><span>View Entries</span></button>
-                <button class="tab-button" onclick="switchTab('notes')"><span>View Notes</span></button>
+                <button class="tab-button" onclick="switchTab('view')"><span>View References</span></button>
+                <button class="tab-button" onclick="switchTab('progress')"><span>View Progress</span></button>
                 <button class="tab-button" onclick="switchTab('books')"><span>Books</span></button>
                 <button class="tab-button" onclick="switchTab('tools')"><span>Tools</span></button>
                 <button class="tab-button" onclick="switchTab('settings')"><span>Settings</span></button>
@@ -64,11 +66,10 @@
                         <label for="term">Term:</label>
                         <div class="autocomplete-wrapper">
                             <input type="text" id="term" name="term" required
-                                   placeholder="e.g., machine learning" autofocus
+                                   placeholder="e.g., machine learning"
                                    autocomplete="off">
                             <div id="autocomplete-list" class="autocomplete-items"></div>
                         </div>
-                        <small style="display: block; margin-top: 0.25rem;">Leave blank to add only a note</small>
                     </div>
 
                     <div class="form-group form-group-ref">
@@ -86,6 +87,7 @@
                                    placeholder="End" class="ref-input" style="width: 65px;"
                                    pattern="[0-9]*" inputmode="numeric">
                         </div>
+                        <small style="display: block; margin-top: 0.25rem;">Leave blank to add only a note</small>
                     </div>
                 </div>
 
@@ -113,11 +115,11 @@
         </div>
         </div>
 
-        <!-- View Entries Tab -->
+        <!-- View References Tab -->
         <div id="tab-view" class="tab-content">
         <div class="card">
             <div class="toolbar">
-                <h2>Index Entries</h2>
+                <h2>Index References</h2>
             </div>
             <div id="viewEntriesMessage" class="message"></div>
 
@@ -129,8 +131,12 @@
                         <option value="">All Books</option>
                     </select>
                 </div>
-                <input type="text" id="searchInput" placeholder="Search terms..."
+                <input type="text" id="searchInput" placeholder="Search terms and notes..."
                        class="search-box">
+                <label class="checkbox-label" style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                    <input type="checkbox" id="showNotesCheckbox" checked onchange="toggleNotesDisplay()">
+                    <span>Show Notes</span>
+                </label>
                 <button onclick="refreshEntries()" class="btn btn-secondary">Refresh</button>
             </div>
 
@@ -146,30 +152,63 @@
         </div>
         </div>
 
-        <!-- Notes Tab -->
-        <div id="tab-notes" class="tab-content">
+        <!-- Progress Tab -->
+        <div id="tab-progress" class="tab-content">
         <div class="card">
             <div class="toolbar">
-                <h2>Notes</h2>
+                <h2>Indexing Progress</h2>
+            </div>
+            <p>Track your indexing completeness by identifying pages that are not yet associated with a reference. This feature requires a page count to be set for each book in the <strong>Books</strong> tab. Click on missing pages to create a reference or exclude them from the analysis.</p>
+
+            <!-- Summary Stats -->
+            <div class="progress-summary-stats">
+                <div class="progress-stat-card">
+                    <div class="progress-stat-value" id="statTotalBooks">-</div>
+                    <div class="progress-stat-label">Total Books</div>
+                </div>
+                <div class="progress-stat-card">
+                    <div class="progress-stat-value" id="statTotalPages">-</div>
+                    <div class="progress-stat-label">Total Pages</div>
+                </div>
+                <div class="progress-stat-card">
+                    <div class="progress-stat-value" id="statIndexedPages">-</div>
+                    <div class="progress-stat-label">Pages Indexed</div>
+                </div>
+                <div class="progress-stat-card">
+                    <div class="progress-stat-value" id="statOverallProgress">-</div>
+                    <div class="progress-stat-label">Overall Progress</div>
+                </div>
             </div>
 
-            <!-- Filter Bar with Search -->
-            <div class="filter-bar">
-                <input type="text" id="notesSearchInput" placeholder="Search notes..."
-                       class="search-box">
-                <button onclick="refreshNotes()" class="btn btn-secondary">Refresh</button>
+            <!-- Charts Grid - Row 1 -->
+            <div class="progress-charts-grid">
+                <div class="progress-chart-card">
+                    <h3>Overall Progress</h3>
+                    <p>Distribution of indexed, excluded, and gap pages</p>
+                    <div class="progress-chart-container" id="progressDonutChart"></div>
+                </div>
+                <div class="progress-chart-card">
+                    <h3>Book Completion Comparison</h3>
+                    <p>Breakdown of indexed, excluded, and gap pages for each book</p>
+                    <div class="progress-chart-container" id="progressStackedBarChart"></div>
+                </div>
             </div>
 
-            <!-- Letter Navigation -->
-            <div id="notesLetterNav" class="letter-nav">
-                <!-- Will be populated by JavaScript -->
+            <!-- Charts Grid - Row 2 -->
+            <div class="progress-charts-grid">
+                <div class="progress-chart-card">
+                    <h3>Term Density by Book</h3>
+                    <p>Terms indexed per 100 pages</p>
+                    <div class="progress-chart-container" id="progressDensityChart"></div>
+                </div>
+                <div class="progress-chart-card">
+                    <h3>Gap Distribution</h3>
+                    <p>Number of gap pages remaining in each book</p>
+                    <div class="progress-chart-container" id="progressTreemapChart"></div>
+                </div>
             </div>
 
-            <div id="notesList" class="notes-list">
-                <p class="loading">Loading...</p>
-            </div>
-
-            <div id="notesStats" class="stats"></div>
+            <div id="gapAnalysisResults" class="gap-results"></div>
         </div>
         </div>
 
@@ -178,7 +217,7 @@
         <div class="card">
             <h2>Book Management</h2>
             <div id="bookManagementMessage" class="message"></div>
-            <p>Manage the books in your index</p>
+            <p>Manage the books in your index. Add custom metadata like author, publisher, and theme.</p>
 
             <div id="booksList" class="books-list"></div>
 
@@ -186,97 +225,196 @@
             <div id="addBookMessage" class="message"></div>
             <div class="book-form">
                 <div class="form-group">
-                    <label for="newBookNumber">Book Number:</label>
-                    <input type="text" id="newBookNumber" placeholder="1">
-                </div>
-                <div class="form-group">
                     <label for="newBookName">Book Name:</label>
                     <input type="text" id="newBookName" placeholder="Volume 1">
                 </div>
-                <div class="form-group">
-                    <label for="newBookPages">Page Count:</label>
-                    <input type="text" id="newBookPages" placeholder="500">
+                <div class="form-row" style="display: flex; gap: 1rem;">
+                    <div class="form-group" style="flex: 1; margin: 0;">
+                        <label for="newBookNumber">Book Number:</label>
+                        <input type="text" id="newBookNumber" placeholder="1" pattern="[0-9]*" inputmode="numeric">
+                    </div>
+                    <div class="form-group" style="flex: 1; margin: 0;">
+                        <label for="newBookPages">Page Count:</label>
+                        <input type="text" id="newBookPages" placeholder="500" pattern="[0-9]*" inputmode="numeric">
+                    </div>
                 </div>
-                <button class="btn btn-primary" onclick="addBook()">Add Book</button>
+                <button class="btn btn-primary" onclick="addBook()" style="margin-top: 1rem;">Add Book</button>
             </div>
         </div>
         </div>
 
         <!-- Tools Tab -->
         <div id="tab-tools" class="tab-content">
-        <h2 style="margin-bottom: 1.5rem; text-transform: uppercase; color: var(--text-color); font-size: 1.5rem; letter-spacing: 0.2em;">Tools</h2>
-
-        <!-- Import Section -->
         <div class="card">
-            <h3 class="collapsible-heading" onclick="toggleToolsSection('import')">
-                <span id="importToggle">▶</span> Import from CSV
-            </h3>
-            <div id="importContainer" class="collapsible-container collapsed">
-                <div id="importMessage" class="message"></div>
-                <p>Paste your CSV data below. Each line can have multiple references for the same term. <a href="#" onclick="showCsvHelpModal(); return false;">Click here for more help.</a></p>
-                <form id="importForm">
-                    <div class="form-group">
-                        <label for="csvData">CSV Data:</label>
-                        <textarea id="csvData" name="csvData" rows="15"
-                                  placeholder="Paste CSV data here, one entry per line&#10;Format: term,reference1,reference2,...&#10;&#10;Examples:&#10;machine learning,1:42&#10;neural networks,2:15-18,2:25,3:10&#10;deep learning,1:50,1:75-80"></textarea>
+            <h2>Tools</h2>
+
+            <!-- Import Section -->
+            <div class="tool-card">
+                <h3 class="collapsible-heading" onclick="toggleToolsSection('import')">
+                    <span id="importToggle">▶</span> Import from CSV
+                </h3>
+                <div id="importContainer" class="collapsible-container collapsed">
+                    <div id="importMessage" class="message"></div>
+
+                    <!-- Import Tabs -->
+                    <div class="import-tabs">
+                        <button class="import-tab active" onclick="switchImportTab('references')">Import References</button>
+                        <button class="import-tab" onclick="switchImportTab('notes')">Import Notes</button>
                     </div>
-                    <button type="submit" class="btn btn-primary">Import Entries</button>
-                </form>
-                <div id="importResults" class="import-results"></div>
-            </div>
-        </div>
 
-        <!-- Export Section -->
-        <div class="card">
-            <h3 class="collapsible-heading" onclick="toggleToolsSection('export')">
-                <span id="exportToggle">▶</span> Export
-            </h3>
-            <div id="exportContainer" class="collapsible-container collapsed">
-                <h4 style="margin-top: 1.5rem;">Export Index</h4>
-                <p>Download your complete index:</p>
-                <div style="display: flex; gap: 1rem; align-items: center; margin-top: 0.5rem;">
-                    <select id="indexExportFormat" class="filter-select" style="flex: 0 0 200px;">
-                        <option value="pdf">PDF</option>
-                        <option value="plain">Plain Text</option>
-                        <option value="markdown">Markdown</option>
-                        <option value="latex">LaTeX</option>
-                        <option value="csv">CSV</option>
-                        <option value="excel">Excel</option>
-                    </select>
-                    <button onclick="exportIndexFromDropdown()" class="btn btn-primary">
-                        Export Index
-                    </button>
-                </div>
+                    <!-- Import References Tab -->
+                    <div id="importReferencesTab" class="import-tab-content active">
+                        <p>Paste your CSV data below. Each line can have multiple references for the same term. <a href="#" onclick="showCsvHelpModal(); return false;">Click here for more help.</a></p>
+                        <form id="importForm">
+                            <div class="form-group">
+                                <label for="csvData">CSV Data:</label>
+                                <textarea id="csvData" name="csvData" rows="12"
+                                          placeholder="Paste CSV data here, one entry per line&#10;Format: term,reference1,reference2,...&#10;&#10;Examples:&#10;machine learning,1:42&#10;neural networks,2:15-18,2:25,3:10&#10;deep learning,1:50,1:75-80"></textarea>
+                            </div>
+                            <small style="display: block; margin-bottom: 1rem;">Only new references are added. Existing references for a term are skipped.</small>
+                            <button type="submit" class="btn btn-primary">Import References</button>
+                        </form>
+                    </div>
 
-                <h4 style="margin-top: 1.5rem;">Export Notes</h4>
-                <p>Download your notes only:</p>
-                <div style="display: flex; gap: 1rem; align-items: center; margin-top: 0.5rem;">
-                    <select id="notesExportFormat" class="filter-select" style="flex: 0 0 200px;">
-                        <option value="pdf">PDF</option>
-                        <option value="txt">Plain Text</option>
-                        <option value="markdown">Markdown</option>
-                        <option value="latex">LaTeX</option>
-                        <option value="csv">CSV</option>
-                        <option value="excel">Excel</option>
-                    </select>
-                    <button onclick="exportNotesFromDropdown()" class="btn btn-primary">
-                        Export Notes
-                    </button>
+                    <!-- Import Notes Tab -->
+                    <div id="importNotesTab" class="import-tab-content">
+                        <p>Import notes for terms. Each line should have a term and its note.</p>
+                        <form id="importNotesForm">
+                            <div class="form-group">
+                                <label for="csvNotesData">CSV Data:</label>
+                                <textarea id="csvNotesData" name="csvNotesData" rows="12"
+                                          placeholder="Paste CSV data here, one entry per line&#10;Format: term,note&#10;&#10;Examples:&#10;machine learning,A subset of AI that learns from data&#10;neural networks,Inspired by biological neural networks&#10;deep learning,Uses multiple layers of neural networks"></textarea>
+                            </div>
+                            <small style="display: block; margin-bottom: 1rem;">Importing a note for an existing term will overwrite the previous note. New terms are created if they don't exist.</small>
+                            <button type="submit" class="btn btn-primary">Import Notes</button>
+                        </form>
+                    </div>
+
+                    <div id="importResults" class="import-results"></div>
                 </div>
             </div>
-        </div>
 
-        <!-- Gap Analysis Section -->
-        <div class="card">
-            <h3 class="collapsible-heading" onclick="toggleToolsSection('gaps')">
-                <span id="gapsToggle">▶</span> Gap Analysis
-            </h3>
-            <div id="gapsContainer" class="collapsible-container collapsed">
-                <p>Identify pages that may not have been indexed for each registered book. Click on missing pages to create a reference or exclude them from the analysis.</p>
+            <!-- Export Section -->
+            <div class="tool-card">
+                <h3 class="collapsible-heading" onclick="toggleToolsSection('export')">
+                    <span id="exportToggle">▶</span> Export
+                </h3>
+                <div id="exportContainer" class="collapsible-container collapsed">
+                    <h4 style="margin-top: 1.5rem;">Export Index</h4>
+                    <p>Download your complete index:</p>
+                    <div style="display: flex; gap: 1rem; align-items: center; margin-top: 0.5rem;">
+                        <select id="indexExportFormat" class="filter-select" style="flex: 0 0 200px;">
+                            <option value="pdf">PDF</option>
+                            <option value="plain">Plain Text</option>
+                            <option value="markdown">Markdown</option>
+                            <option value="latex">LaTeX</option>
+                            <option value="csv">CSV</option>
+                            <option value="excel">Excel</option>
+                        </select>
+                        <button onclick="exportIndexFromDropdown()" class="btn btn-primary">
+                            Export Index
+                        </button>
+                    </div>
 
-                <div id="gapAnalysisResults" class="gap-results"></div>
+                    <h4 style="margin-top: 1.5rem;">Export Notes</h4>
+                    <p>Download your notes only:</p>
+                    <div style="display: flex; gap: 1rem; align-items: center; margin-top: 0.5rem;">
+                        <select id="notesExportFormat" class="filter-select" style="flex: 0 0 200px;">
+                            <option value="pdf">PDF</option>
+                            <option value="txt">Plain Text</option>
+                            <option value="markdown">Markdown</option>
+                            <option value="latex">LaTeX</option>
+                            <option value="csv">CSV</option>
+                            <option value="excel">Excel</option>
+                        </select>
+                        <button onclick="exportNotesFromDropdown()" class="btn btn-primary">
+                            Export Notes
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI Term Enrichment Section -->
+            <div class="tool-card">
+                <h3 class="collapsible-heading" onclick="toggleToolsSection('ai')">
+                    <span id="aiToggle">▶</span> AI Term Enrichment
+                </h3>
+                <div id="aiContainer" class="collapsible-container collapsed">
+                    <p>Generate brief descriptions for terms without notes using AI. <a href="#" onclick="event.preventDefault(); showAiHelpModal();">Learn more</a></p>
+
+                    <div id="aiMessage" class="message" style="margin-bottom: 1rem;"></div>
+
+                    <div class="ai-actions" style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                        <button type="button" class="btn" onclick="copyAiPrompt()">Copy AI Prompt</button>
+                        <button type="button" class="btn btn-primary" onclick="enrichTermsWithApi()" id="enrichApiBtn" style="display: none;">Enrich with API</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Study Mode Section -->
+            <div class="tool-card">
+                <h3 class="collapsible-heading" onclick="toggleToolsSection('study')">
+                    <span id="studyToggle">▶</span> Study Mode
+                </h3>
+                <div id="studyContainer" class="collapsible-container collapsed">
+                    <p>Review your terms with flashcards. Click the card to reveal the notes.</p>
+
+                    <div id="studySetup">
+                        <div class="form-group" style="margin-bottom: 1rem;">
+                            <label for="studyFilter">Filter by:</label>
+                            <select id="studyFilter" class="ref-input" style="width: 100%;">
+                                <option value="all">All terms with notes</option>
+                                <option value="book">Specific book</option>
+                            </select>
+                        </div>
+                        <div id="studyBookFilter" class="form-group" style="margin-bottom: 1rem; display: none;">
+                            <label for="studyBookSelect">Book:</label>
+                            <select id="studyBookSelect" class="ref-input" style="width: 100%;"></select>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 1rem;">
+                            <label class="checkbox-label" style="display: flex; align-items: center; gap: 0.5rem;">
+                                <input type="checkbox" id="studyShuffle" checked>
+                                <span>Shuffle cards</span>
+                            </label>
+                        </div>
+                        <button type="button" class="btn btn-primary" onclick="startStudyMode()">Start Study Session</button>
+                    </div>
+                </div>
             </div>
         </div>
+        </div>
+
+        <!-- Study Mode Overlay -->
+        <div id="studyOverlay" class="study-overlay">
+            <div class="study-session-container">
+                <div class="study-header">
+                    <div class="study-progress">
+                        <span id="studyProgress">0 / 0</span>
+                    </div>
+                    <button type="button" class="btn-end-session" onclick="endStudyMode()" title="End Session">&times;</button>
+                </div>
+
+                <div class="flashcard-wrapper">
+                    <div class="flashcard" id="flashcard" onclick="flipFlashcard()">
+                        <div class="flashcard-inner" id="flashcardInner">
+                            <div class="flashcard-front">
+                                <div class="flashcard-term" id="flashcardTerm"></div>
+                                <div class="flashcard-hint">Click to reveal</div>
+                            </div>
+                            <div class="flashcard-back">
+                                <div class="flashcard-term" id="flashcardTermBack"></div>
+                                <div class="flashcard-notes" id="flashcardNotes"></div>
+                                <div class="flashcard-refs" id="flashcardRefs"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="study-controls">
+                    <button type="button" class="btn btn-secondary" onclick="prevFlashcard()" id="prevCardBtn">Previous</button>
+                    <button type="button" class="btn btn-primary" onclick="nextFlashcard()" id="nextCardBtn">Next</button>
+                </div>
+            </div>
         </div>
 
         <!-- Settings Tab -->
@@ -284,57 +422,70 @@
         <div class="card">
             <h2>Settings</h2>
 
-            <div class="settings-section">
-                <h3>Index Settings</h3>
-                <div id="indexSettingsMessage" class="message"></div>
-                <div class="form-group">
-                    <label for="settingsIndexName">Index Name:</label>
-                    <input type="text" id="settingsIndexName" placeholder="My Book Index">
-                </div>
+            <!-- Index Settings Section -->
+            <div class="tool-card">
+                <h3 class="collapsible-heading" onclick="toggleSettingsSection('indexSettings')">
+                    <span id="indexSettingsToggle">▶</span> Index Settings
+                </h3>
+                <div id="indexSettingsContainer" class="collapsible-container collapsed">
+                    <p class="settings-help">Update index name and add custom metadata like author, publisher, or edition to your index. Click a property to edit, drag to reorder.</p>
+                    <div id="indexSettingsMessage" class="message"></div>
+                    <div class="form-group">
+                        <label for="settingsIndexName">Index Name:</label>
+                        <input type="text" id="settingsIndexName" placeholder="My Book Index">
+                    </div>
 
-                <div class="custom-properties-form" style="margin-top: 1.5rem;">
-                    <div class="form-row" style="display: flex; gap: 1rem; margin-bottom: 1rem;">
-                        <div class="form-group" style="flex: 1; margin: 0;">
-                            <label for="propertyName">Custom Property:</label>
-                            <input type="text" id="propertyName" placeholder="e.g., Author, Publisher, Edition">
-                        </div>
-                        <div class="form-group" style="flex: 1; margin: 0;">
-                            <label for="propertyValue">Value:</label>
-                            <input type="text" id="propertyValue" placeholder="e.g., John Smith">
+                    <div class="custom-properties-form" style="margin-top: 1.5rem;">
+                        <div class="form-row" style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                            <div class="form-group" style="flex: 1; margin: 0;">
+                                <label for="propertyName">Metadata:</label>
+                                <input type="text" id="propertyName" placeholder="e.g., Author, Publisher, Edition">
+                            </div>
+                            <div class="form-group" style="flex: 1; margin: 0;">
+                                <label for="propertyValue">Value:</label>
+                                <input type="text" id="propertyValue" placeholder="e.g., John Smith">
+                            </div>
                         </div>
                     </div>
+                    <button class="btn btn-primary" onclick="saveAllSettings()">Save</button>
+
+                    <div id="customPropertiesTable" class="custom-properties-table" style="margin-top: 1rem;">
+                        <!-- Properties will be loaded here -->
+                    </div>
                 </div>
-
-                <button class="btn btn-primary" onclick="saveAllSettings()">Save</button>
-
-                <div id="customPropertiesTable" class="custom-properties-table" style="margin-top: 1rem;">
-                    <!-- Properties will be loaded here -->
-                </div>
-
-                <small style="display: block; margin-top: 0.5rem;">Add metadata like author, publisher, or edition to your index. Click a property to edit, drag to reorder.</small>
             </div>
 
-            <div class="settings-section">
-                <h3>Appearance</h3>
-                <div id="colorSchemeMessage" class="message"></div>
-                <div class="form-group">
-                    <label for="colorScheme">Accent Color:</label>
-                    <select id="colorScheme" class="color-scheme-select" onchange="changeColorScheme()">
-                        <option value="#f2849e" data-name="Coral Pink" style="background-color: #f2849e;">Coral Pink</option>
-                        <option value="#84f2de" data-name="Teal" style="background-color: #84f2de;">Teal</option>
-                        <option value="#c9a961" data-name="Gold" style="background-color: #c9a961;">Gold</option>
-                        <option value="#84c4f2" data-name="Blue" style="background-color: #84c4f2;">Blue</option>
-                        <option value="#f2a063" data-name="Orange" style="background-color: #f2a063;">Orange</option>
-                    </select>
+            <!-- Appearance Section -->
+            <div class="tool-card">
+                <h3 class="collapsible-heading" onclick="toggleSettingsSection('appearance')">
+                    <span id="appearanceToggle">▶</span> Appearance
+                </h3>
+                <div id="appearanceContainer" class="collapsible-container collapsed">
+                    <p class="settings-help">Choose an accent color for buttons, links, and highlights.</p>
+                    <div id="colorSchemeMessage" class="message"></div>
+                    <div class="form-group">
+                        <label for="colorScheme">Accent Color:</label>
+                        <select id="colorScheme" class="color-scheme-select" onchange="changeColorScheme()">
+                            <option value="#9ca3af" data-name="Slate Grey" style="background-color: #9ca3af;">Slate Grey</option>
+                            <option value="#f2849e" data-name="Coral Pink" style="background-color: #f2849e;">Coral Pink</option>
+                            <option value="#84f2de" data-name="Teal" style="background-color: #84f2de;">Teal</option>
+                            <option value="#c9a961" data-name="Gold" style="background-color: #c9a961;">Gold</option>
+                            <option value="#84c4f2" data-name="Blue" style="background-color: #84c4f2;">Blue</option>
+                            <option value="#f2a063" data-name="Orange" style="background-color: #f2a063;">Orange</option>
+                        </select>
+                    </div>
                 </div>
-                <small>Choose an accent color for buttons, links, and highlights</small>
             </div>
 
-            <div class="settings-section">
-                <h3>Index Management</h3>
-                <div class="form-group" style="margin-bottom: 0;">
-                    <label for="indexManagementAction">Action:</label>
-                    <div style="display: flex; gap: 1rem; align-items: flex-start;">
+            <!-- Index Management Section -->
+            <div class="tool-card">
+                <h3 class="collapsible-heading" onclick="toggleSettingsSection('indexManagement')">
+                    <span id="indexManagementToggle">▶</span> Index Management
+                </h3>
+                <div id="indexManagementContainer" class="collapsible-container collapsed">
+                    <p class="settings-help">Create, backup, import, or archive your indexes.</p>
+                    <div class="form-group">
+                        <label for="indexManagementAction">Action:</label>
                         <select id="indexManagementAction" class="ref-input book-select" style="min-width: 200px;">
                             <option value="">Select an action...</option>
                             <option value="create">Create New Index</option>
@@ -342,10 +493,49 @@
                             <option value="import">Import Index</option>
                             <option value="archive">Archive Index</option>
                         </select>
-                        <button class="btn btn-primary" onclick="executeIndexManagementAction()">Go</button>
+                    </div>
+                    <button class="btn btn-primary" onclick="executeIndexManagementAction()">Go</button>
+                </div>
+            </div>
+
+            <!-- AI Features Section -->
+            <div class="tool-card">
+                <h3 class="collapsible-heading" onclick="toggleSettingsSection('aiFeatures')">
+                    <span id="aiFeaturesToggle">▶</span> AI Features
+                </h3>
+                <div id="aiFeaturesContainer" class="collapsible-container collapsed">
+                    <p class="settings-help">Configure AI to auto generate study notes.</p>
+                    <div id="aiSettingsMessage" class="message"></div>
+
+                    <div class="form-group">
+                        <label for="aiProvider">AI Provider:</label>
+                        <select id="aiProvider" class="ref-input" style="width: 100%;">
+                            <option value="">-- Select Provider --</option>
+                            <option value="anthropic">Anthropic (Claude)</option>
+                            <option value="openai">OpenAI (ChatGPT)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="aiApiKey">API Key:</label>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="password" id="aiApiKey" class="ref-input" style="flex: 1;" placeholder="Enter your API key">
+                            <button type="button" class="btn btn-secondary" onclick="validateAiApiKey()" id="validateKeyBtn">Validate</button>
+                        </div>
+                        <small id="apiKeyValidationStatus" style="display: none; margin-top: 0.25rem;"></small>
+                    </div>
+
+                    <label class="checkbox-label" style="display: flex; align-items: center; gap: 0.5rem;">
+                        <input type="checkbox" id="enableAiFeatures" disabled>
+                        <span>Enable AI features</span>
+                    </label>
+                    <small id="enableAiHint" style="display: block; margin-bottom: 1rem;">To enable automated AI features you must first save an API key.</small>
+
+                    <div style="display: flex; gap: 1rem;">
+                        <button type="button" class="btn btn-primary" onclick="saveAiSettings()">Save</button>
+                        <button type="button" class="btn btn-secondary" onclick="clearAiApiKey()">Clear API Key</button>
                     </div>
                 </div>
-                <small>Create, backup, import, or archive your indexes</small>
             </div>
         </div>
         </div>
@@ -484,7 +674,7 @@
 
                     <div class="form-group">
                         <label for="editBookNumber">Book Number:</label>
-                        <input type="text" id="editBookNumber" name="editBookNumber" required>
+                        <input type="text" id="editBookNumber" name="editBookNumber" required pattern="[0-9]*" inputmode="numeric">
                     </div>
 
                     <div class="form-group">
@@ -519,7 +709,7 @@
 
                     <div class="form-group">
                         <label for="addBookModalNumber">Book Number:</label>
-                        <input type="text" id="addBookModalNumber" name="addBookModalNumber" required>
+                        <input type="text" id="addBookModalNumber" name="addBookModalNumber" required pattern="[0-9]*" inputmode="numeric">
                     </div>
 
                     <div class="form-group">
@@ -591,9 +781,9 @@
                     <h2>Help & Keyboard Shortcuts</h2>
                     <button class="modal-close" onclick="closeHelpModal()">&times;</button>
                 </div>
-                <div class="modal-body">
+                <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
                     <h3 style="margin-top: 0; margin-bottom: 1em; color: var(--text-color);">Keyboard Shortcuts</h3>
-                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 2em;">
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 1.5em;">
                         <thead>
                             <tr style="border-bottom: 2px solid var(--border-color);">
                                 <th style="text-align: left; padding: 0.75em 1em; font-weight: 700;">Key</th>
@@ -603,7 +793,7 @@
                         <tbody>
                             <tr style="border-bottom: 1px solid var(--border-color);">
                                 <td style="padding: 0.75em 1em;"><code style="background: var(--hover-color); padding: 0.2em 0.5em; border-radius: 3px;">1-6</code></td>
-                                <td style="padding: 0.75em 1em;">Navigate to tabs (1=Add Entry, 2=View, 3=Notes, 4=Books, 5=Tools, 6=Settings)</td>
+                                <td style="padding: 0.75em 1em;">Navigate to tabs (1=Add Entry, 2=View References, 3=Progress, 4=Books, 5=Tools, 6=Settings)</td>
                             </tr>
                             <tr style="border-bottom: 1px solid var(--border-color);">
                                 <td style="padding: 0.75em 1em;"><code style="background: var(--hover-color); padding: 0.2em 0.5em; border-radius: 3px;">/</code></td>
@@ -616,28 +806,66 @@
                         </tbody>
                     </table>
 
+                    <h4 style="margin-top: 0; margin-bottom: 0.75em; color: var(--text-color);">Study Mode Shortcuts</h4>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 2em;">
+                        <tbody>
+                            <tr style="border-bottom: 1px solid var(--border-color);">
+                                <td style="padding: 0.5em 1em;"><code style="background: var(--hover-color); padding: 0.2em 0.5em; border-radius: 3px;">Space</code></td>
+                                <td style="padding: 0.5em 1em;">Flip flashcard</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--border-color);">
+                                <td style="padding: 0.5em 1em;"><code style="background: var(--hover-color); padding: 0.2em 0.5em; border-radius: 3px;">N</code></td>
+                                <td style="padding: 0.5em 1em;">Next flashcard</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--border-color);">
+                                <td style="padding: 0.5em 1em;"><code style="background: var(--hover-color); padding: 0.2em 0.5em; border-radius: 3px;">P</code></td>
+                                <td style="padding: 0.5em 1em;">Previous flashcard</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--border-color);">
+                                <td style="padding: 0.5em 1em;"><code style="background: var(--hover-color); padding: 0.2em 0.5em; border-radius: 3px;">Esc</code></td>
+                                <td style="padding: 0.5em 1em;">End study session</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
                     <h3 style="margin-top: 1.5em; margin-bottom: 1em; color: var(--text-color);">Quick Start Guide</h3>
 
                     <h4 style="margin-top: 1em; margin-bottom: 0.5em; font-size: 1em; color: var(--primary-color);">1. Add Books</h4>
-                    <p style="margin-bottom: 1em;">Go to the <strong>Books</strong> tab and add your textbooks with their numbers and versions.</p>
+                    <p style="margin-bottom: 1em;">Go to the <strong>Books</strong> tab and add your textbooks with their numbers, page counts, and custom metadata (author, publisher, etc.).</p>
 
                     <h4 style="margin-top: 1em; margin-bottom: 0.5em; font-size: 1em; color: var(--primary-color);">2. Create Index Entries</h4>
                     <p style="margin-bottom: 1em;">On the <strong>Add Entry</strong> tab, enter terms with book:page references (e.g., "1:42" or "2:15-18" for page ranges).</p>
 
                     <h4 style="margin-top: 1em; margin-bottom: 0.5em; font-size: 1em; color: var(--primary-color);">3. Add Notes</h4>
-                    <p style="margin-bottom: 1em;">Add study notes to any term. View all notes in the <strong>Notes</strong> tab.</p>
+                    <p style="margin-bottom: 1em;">Add study notes to any term. Notes are displayed in the <strong>View References</strong> tab. Use the Show Notes toggle to show/hide notes.</p>
 
-                    <h4 style="margin-top: 1em; margin-bottom: 0.5em; font-size: 1em; color: var(--primary-color);">4. Export Your Index</h4>
-                    <p style="margin-bottom: 1em;">Use the <strong>Tools</strong> tab to export your index to LaTeX, PDF, or other formats.</p>
+                    <h4 style="margin-top: 1em; margin-bottom: 0.5em; font-size: 1em; color: var(--primary-color);">4. Track Progress</h4>
+                    <p style="margin-bottom: 1em;">The <strong>View Progress</strong> tab shows visual charts of your indexing progress including overall completion, term density, and gap distribution. Click on book cards to see detailed page-level gap analysis.</p>
 
-                    <h4 style="margin-top: 1em; margin-bottom: 0.5em; font-size: 1em; color: var(--primary-color);">5. Gap Analysis</h4>
-                    <p style="margin-bottom: 1em;">Check which pages aren't indexed yet in the <strong>Tools</strong> tab under Gap Analysis.</p>
+                    <h4 style="margin-top: 1em; margin-bottom: 0.5em; font-size: 1em; color: var(--primary-color);">5. Study Mode</h4>
+                    <p style="margin-bottom: 1em;">Use <strong>Tools → Study Mode</strong> to review your terms as flashcards. The card shows the term on the front and notes/references on the back.</p>
+
+                    <h4 style="margin-top: 1em; margin-bottom: 0.5em; font-size: 1em; color: var(--primary-color);">6. Export Your Index</h4>
+                    <p style="margin-bottom: 1em;">Use the <strong>Tools</strong> tab to export your index to LaTeX, PDF, Markdown, or plain text formats.</p>
+
+                    <h3 style="margin-top: 1.5em; margin-bottom: 1em; color: var(--text-color);">Features</h3>
+                    <ul style="list-style: disc; padding-left: 1.5em;">
+                        <li style="margin-bottom: 0.5em;"><strong>Progress Charts</strong> - Visual dashboards showing overall progress, term density by book, book completion comparison, and gap distribution</li>
+                        <li style="margin-bottom: 0.5em;"><strong>Collapsible Sections</strong> - Tools and Settings use accordion-style sections for better organization</li>
+                        <li style="margin-bottom: 0.5em;"><strong>Book Metadata</strong> - Add custom properties like author, publisher, or edition to each book with drag-to-reorder support</li>
+                        <li style="margin-bottom: 0.5em;"><strong>Gap Analysis</strong> - Identify unindexed pages and exclude pages from analysis (front matter, etc.)</li>
+                        <li style="margin-bottom: 0.5em;"><strong>AI Integration</strong> - Optional AI-powered note generation (requires API key in Settings)</li>
+                        <li style="margin-bottom: 0.5em;"><strong>Multiple Indexes</strong> - Create, switch between, backup, and archive separate indexes</li>
+                        <li style="margin-bottom: 0.5em;"><strong>Customizable Appearance</strong> - Choose from multiple accent colors in Settings</li>
+                    </ul>
 
                     <h3 style="margin-top: 1.5em; margin-bottom: 1em; color: var(--text-color);">Tips</h3>
                     <ul style="list-style: disc; padding-left: 1.5em;">
                         <li style="margin-bottom: 0.5em;">Use the autocomplete on the term field to quickly reference existing terms</li>
-                        <li style="margin-bottom: 0.5em;">Click references to edit them directly from the View Entries tab</li>
-                        <li style="margin-bottom: 0.5em;">Export your database regularly from the Settings tab as a backup</li>
+                        <li style="margin-bottom: 0.5em;">Click references to edit them directly from the View References tab</li>
+                        <li style="margin-bottom: 0.5em;">Set page counts for books to enable progress tracking and gap analysis</li>
+                        <li style="margin-bottom: 0.5em;">Backup your index regularly from Settings → Index Management</li>
+                        <li style="margin-bottom: 0.5em;">Click on chart elements to see full book names in tooltips</li>
                     </ul>
                 </div>
                 <div class="modal-actions">
@@ -788,6 +1016,8 @@
                     <button class="modal-close" onclick="closeCsvHelpModal()">&times;</button>
                 </div>
                 <div class="modal-body">
+                    <p style="margin-bottom: 1.5em;">Use this tool to bulk import term references from CSV-formatted data.</p>
+
                     <h3 style="margin-top: 0; margin-bottom: 1em; color: var(--text-color);">Format</h3>
                     <p style="margin-bottom: 1em;"><code style="background: #f5f5f5; padding: 0.2em 0.5em; border-radius: 3px;">term,reference1,reference2,...</code></p>
 
@@ -821,6 +1051,47 @@
             </div>
         </div>
 
+        <!-- AI Help Modal -->
+        <div id="aiHelpModal" class="modal">
+            <div class="modal-content" style="max-width: 650px;">
+                <div class="modal-header">
+                    <h2>AI Term Enrichment Help</h2>
+                    <button class="modal-close" onclick="closeAiHelpModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p style="margin-bottom: 1.5em;">Use AI to generate brief descriptions for your index terms. There are two ways to use this feature:</p>
+
+                    <h3 style="margin-top: 0; margin-bottom: 0.75em; color: var(--text-color);">Manual Mode (Recommended)</h3>
+                    <p style="margin-bottom: 0.5em;">For users with access to AI chat services like Claude or ChatGPT.</p>
+                    <ol style="padding-left: 1.5em; margin-bottom: 1.5em;">
+                        <li style="margin-bottom: 0.5em;">Select your AI Provider in <strong>Settings → AI Features</strong></li>
+                        <li style="margin-bottom: 0.5em;">Click <strong>Copy AI Prompt</strong> to copy a pre-formatted prompt with your terms</li>
+                        <li style="margin-bottom: 0.5em;">Paste the prompt into your AI service (Claude, ChatGPT, etc.)</li>
+                        <li style="margin-bottom: 0.5em;">Copy the CSV response from the AI</li>
+                        <li style="margin-bottom: 0.5em;">Go to <strong>Tools → Import from CSV → Import Notes</strong></li>
+                        <li style="margin-bottom: 0.5em;">Paste the CSV and import the descriptions as notes</li>
+                    </ol>
+
+                    <h3 style="margin-top: 1.5em; margin-bottom: 0.75em; color: var(--text-color);">Automatic Mode (API)</h3>
+                    <p style="margin-bottom: 0.5em;">For users with API access to Claude or OpenAI.</p>
+                    <ol style="padding-left: 1.5em; margin-bottom: 1em;">
+                        <li style="margin-bottom: 0.5em;">Go to <strong>Settings → AI Features</strong></li>
+                        <li style="margin-bottom: 0.5em;">Select your AI Provider and enter your API key</li>
+                        <li style="margin-bottom: 0.5em;">Check <strong>Enable AI features</strong> and save</li>
+                        <li style="margin-bottom: 0.5em;">Return here and click <strong>Enrich with API</strong> to automatically generate descriptions</li>
+                    </ol>
+                    <p style="margin-bottom: 1.5em; font-size: 0.9em; color: var(--secondary-color);">We optimize your API usage by processing terms in bulk and using cost-effective models that deliver great results at lower cost.</p>
+
+                    <p style="margin-top: 1.5em; padding: 0.75em; background: rgba(var(--secondary-color-rgb, 156, 163, 175), 0.1); border-radius: 4px; font-size: 0.9em;">
+                        <strong>Tip:</strong> Manual mode is free if you already have a Claude or ChatGPT subscription. API mode requires a separate API subscription with associated costs.
+                    </p>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeAiHelpModal()">Close</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Edit Property Modal -->
         <div id="editPropertyModal" class="modal">
             <div class="modal-content" style="max-width: 500px;">
@@ -844,6 +1115,35 @@
                         <button type="submit" class="btn btn-primary">Save</button>
                         <button type="button" class="btn btn-danger" onclick="deletePropertyFromModal()">Delete</button>
                         <button type="button" class="btn btn-secondary" onclick="closeEditPropertyModal()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Edit Book Property Modal -->
+        <div id="editBookPropertyModal" class="modal">
+            <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h2>Edit Book Metadata</h2>
+                    <button class="modal-close" onclick="closeEditBookPropertyModal()">&times;</button>
+                </div>
+                <form id="editBookPropertyForm" onsubmit="saveEditedBookProperty(event)">
+                    <div class="modal-body">
+                        <input type="hidden" id="editBookPropertyModalId" value="">
+                        <input type="hidden" id="editBookPropertyModalBookNumber" value="">
+                        <div class="form-group">
+                            <label for="editBookPropertyModalName">Metadata:</label>
+                            <input type="text" id="editBookPropertyModalName" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="editBookPropertyModalValue">Value:</label>
+                            <input type="text" id="editBookPropertyModalValue" required>
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="submit" class="btn btn-primary">Save</button>
+                        <button type="button" class="btn btn-danger" onclick="deleteBookPropertyFromModal()">Delete</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeEditBookPropertyModal()">Cancel</button>
                     </div>
                 </form>
             </div>
@@ -897,6 +1197,48 @@
             </div>
         </div>
 
+        <!-- Create Index Modal -->
+        <div id="createIndexModal" class="modal">
+            <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h2>Create New Index</h2>
+                    <button class="modal-close" onclick="closeCreateIndexModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="createIndexMessage" class="message"></div>
+                    <form id="createIndexForm" onsubmit="submitCreateIndex(event)">
+                        <div class="form-group">
+                            <label for="createIndexName">Index Name:</label>
+                            <input type="text" id="createIndexName" placeholder="e.g., CFA Level 2, GIAC GSEC" required>
+                            <small>Give your index a name to identify it</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="createIndexBookName">First Book Name:</label>
+                            <input type="text" id="createIndexBookName" placeholder="e.g., Volume 1, Study Guide" required>
+                        </div>
+
+                        <div class="get-started-inline-group">
+                            <div class="form-group">
+                                <label for="createIndexBookNumber">Book Number:</label>
+                                <input type="text" id="createIndexBookNumber" value="1" required pattern="[0-9]*" inputmode="numeric">
+                            </div>
+                            <div class="form-group">
+                                <label for="createIndexBookPages">Page Count:</label>
+                                <input type="text" id="createIndexBookPages" placeholder="e.g., 500" pattern="[0-9]*" inputmode="numeric">
+                            </div>
+                        </div>
+                        <small style="display: block; margin-bottom: 1em;">Book number is usually "1" for your first book. Page count is optional and used for gap analysis.</small>
+
+                        <div class="modal-actions">
+                            <button type="submit" class="btn btn-primary">Create Index</button>
+                            <button type="button" class="btn btn-secondary" onclick="closeCreateIndexModal()">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
         <!-- Get Started Modal -->
         <div id="getStartedModal" class="modal">
             <div class="modal-content" style="max-width: 500px;">
@@ -904,46 +1246,71 @@
                     <h2>Welcome to Index it!</h2>
                 </div>
                 <div class="modal-body">
-                    <p style="margin-bottom: 1.5em;">Create and manage your book index offline. Let's get you started by setting up your first index.</p>
+                    <p style="margin-bottom: 1.5em;">Let's crush your open book exam. Choose how you would like to get started:</p>
 
                     <div id="getStartedMessage" class="message"></div>
 
-                    <form id="getStartedForm">
-                        <div class="form-group">
-                            <label for="getStartedIndexName">Index Name:</label>
-                            <input type="text" id="getStartedIndexName" placeholder="e.g., CFA Level 2, GIAC GSEC" required>
-                            <small>Give your index a name to identify it</small>
+                    <div class="get-started-options">
+                        <!-- Create New Index -->
+                        <div class="get-started-option-group">
+                            <button type="button" class="btn get-started-btn" onclick="toggleGetStartedSection('create')">Create a new index</button>
+                            <div id="getStartedCreateSection" class="get-started-section">
+                                <form id="getStartedForm">
+                                    <div class="form-group">
+                                        <label for="getStartedIndexName">Index Name:</label>
+                                        <input type="text" id="getStartedIndexName" placeholder="e.g., CFA Level 2, GIAC GSEC" required>
+                                        <small>Give your index a name to identify it</small>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="getStartedBookName">First Book Name:</label>
+                                        <input type="text" id="getStartedBookName" placeholder="e.g., Volume 1, Study Guide" required>
+                                    </div>
+
+                                    <div class="get-started-inline-group">
+                                        <div class="form-group">
+                                            <label for="getStartedBookNumber">Book Number:</label>
+                                            <input type="text" id="getStartedBookNumber" value="1" required pattern="[0-9]*" inputmode="numeric">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="getStartedBookPages">Page Count:</label>
+                                            <input type="text" id="getStartedBookPages" placeholder="e.g., 500" pattern="[0-9]*" inputmode="numeric">
+                                        </div>
+                                    </div>
+                                    <small style="display: block; margin-bottom: 1em;">Book number is usually "1" for your first book. Page count is optional and used for gap analysis.</small>
+
+                                    <p style="font-size: 0.9em; color: var(--secondary-color);">
+                                        You can change these settings later in the <strong>Settings</strong> section.
+                                    </p>
+
+                                    <div class="modal-actions" style="margin-top: 1em;">
+                                        <button type="submit" class="btn btn-primary">Create Index</button>
+                                    </div>
+                                </form>
+                            </div>
                         </div>
 
-                        <div class="form-group">
-                            <label for="getStartedBookNumber">First Book Number:</label>
-                            <input type="text" id="getStartedBookNumber" value="1" required>
-                            <small>Usually "1" for your first book</small>
+                        <!-- Import Existing -->
+                        <div class="get-started-option-group">
+                            <button type="button" class="btn get-started-btn" onclick="toggleGetStartedSection('import')">Import an existing index</button>
+                            <div id="getStartedImportSection" class="get-started-section">
+                                <p>Import an existing .db index file from your computer.</p>
+                                <div class="modal-actions" style="margin-top: 1em;">
+                                    <button type="button" class="btn btn-primary" onclick="closeGetStartedModal(); showImportDatabaseModal();">Select File to Import</button>
+                                </div>
+                            </div>
                         </div>
 
-                        <div class="form-group">
-                            <label for="getStartedBookName">First Book Name:</label>
-                            <input type="text" id="getStartedBookName" placeholder="e.g., Volume 1, Study Guide" required>
+                        <!-- Demo Index -->
+                        <div class="get-started-option-group">
+                            <button type="button" class="btn get-started-btn" onclick="toggleGetStartedSection('demo')">Load up a demo index</button>
+                            <div id="getStartedDemoSection" class="get-started-section">
+                                <p>Load a demo index with sample entries to explore the features.</p>
+                                <div class="modal-actions" style="margin-top: 1em;">
+                                    <button type="button" class="btn btn-primary" onclick="loadDemoIndex()">Load Demo Index</button>
+                                </div>
+                            </div>
                         </div>
-
-                        <div class="form-group">
-                            <label for="getStartedBookPages">Page Count:</label>
-                            <input type="text" id="getStartedBookPages" placeholder="e.g., 500" pattern="[0-9]*" inputmode="numeric">
-                            <small>Optional - used for gap analysis</small>
-                        </div>
-
-                        <p style="margin-top: 1.5em; font-size: 0.9em; color: var(--secondary-color);">
-                            You can change these settings later in the <strong>Settings</strong> section, and add more books in the <strong>Books</strong> section.
-                        </p>
-
-                        <div class="modal-actions">
-                            <button type="submit" class="btn btn-primary">Get Started</button>
-                        </div>
-                    </form>
-
-                    <div style="margin-top: 1.5em; padding-top: 1.5em; border-top: 1px solid var(--border-color); text-align: center;">
-                        <p style="font-size: 0.9em; color: var(--text-color); margin-bottom: 0.5em;">Already have an index?</p>
-                        <a href="#" onclick="closeGetStartedModal(); showImportDatabaseModal(); return false;" style="color: var(--secondary-color);">Import existing index</a>
                     </div>
                 </div>
             </div>
@@ -958,15 +1325,14 @@
     <nav id="menu">
         <div class="inner">
             <h2>Menu</h2>
-            <ul>
+            <ul>				
                 <!-- Mobile Quick Access (hidden on desktop) -->
                 <li class="mobile-only"><a href="#" onclick="menuNavigate('add'); return false;">Add Entry</a></li>
-                <li class="mobile-only"><a href="#" onclick="menuNavigate('view'); return false;">View Entries</a></li>
-                <li class="mobile-only"><a href="#" onclick="menuNavigate('notes'); return false;">Notes</a></li>
+                <li class="mobile-only"><a href="#" onclick="menuNavigate('view'); return false;">View References</a></li>
+                <li class="mobile-only"><a href="#" onclick="menuNavigate('progress'); return false;">View Progress</a></li>
                 <li class="mobile-only"><a href="#" onclick="menuNavigate('books'); return false;">Books</a></li>
                 <li class="mobile-only"><a href="#" onclick="menuNavigate('tools'); return false;">Tools</a></li>
                 <li class="mobile-only"><a href="#" onclick="menuNavigate('settings'); return false;">Settings</a></li>
-                <li class="mobile-only menu-divider"></li>
 
                 <!-- Info links (all devices) -->
                 <li><a href="#" onclick="showAboutModal(); return false;">About</a></li>

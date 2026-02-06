@@ -10,6 +10,7 @@ from datetime import datetime
 import re
 import os
 import shutil
+import sqlite3
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', os.urandom(24))
@@ -19,9 +20,17 @@ db_manager = DatabaseManager()
 formatter = IndexFormatter()
 
 
-def get_current_db() -> IndexDatabase:
-    """Get the active database for the current session"""
+def get_current_db():
+    """Get the active database for the current session. Returns None if no database exists."""
     db_name = session.get('active_database', None)
+
+    # Check if the session's database actually exists
+    if db_name:
+        db_path = db_manager.databases_dir / db_name
+        if not db_path.exists():
+            # Session has stale reference - clear it
+            db_name = None
+            session.pop('active_database', None)
 
     if not db_name:
         # First run: check for legacy database
@@ -29,16 +38,20 @@ def get_current_db() -> IndexDatabase:
         if legacy_path.exists():
             # Migrate legacy database
             migrate_legacy_database()
-            db_name = session['active_database']
+            db_name = session.get('active_database')
         else:
-            # Create default database
-            db_name = 'index_Book_Index.db'
-            default_path = db_manager.databases_dir / db_name
-            if not default_path.exists():
-                # Create new default database
-                db = IndexDatabase(str(default_path))
-                db.set_setting('index_name', 'Book Index')
-            session['active_database'] = db_name
+            # Check if any databases exist
+            databases = db_manager.list_databases()
+            if databases:
+                # Use the first available database
+                db_name = databases[0]['db_name']
+                session['active_database'] = db_name
+            else:
+                # No databases exist - don't create one automatically
+                return None
+
+    if not db_name:
+        return None
 
     return db_manager.get_database(db_name)
 
@@ -73,8 +86,7 @@ def migrate_legacy_database():
         print(f"Legacy database backed up to {backup_path}")
     except Exception as e:
         print(f"Error migrating legacy database: {e}")
-        # Fall back to default
-        session['active_database'] = 'index_Book_Index.db'
+        # Don't set any default - let user create via Get Started modal
 
 # Add CORS headers to all responses
 @app.after_request
@@ -88,6 +100,23 @@ def after_request(response):
 def index():
     """Main page"""
     return render_template('index.html')
+
+
+@app.route('/prototype/progress')
+def progress_prototype():
+    """Progress charts prototype page"""
+    return render_template('progress_prototype.html')
+
+
+# Setup Check API Endpoint
+
+@app.route('/api/needs-setup', methods=['GET'])
+def needs_setup():
+    """Check if the app needs initial setup (no databases exist)"""
+    databases = db_manager.list_databases()
+    return jsonify({
+        'needs_setup': len(databases) == 0
+    })
 
 
 # Database Management API Endpoints
@@ -182,6 +211,38 @@ def create_database():
     })
 
 
+@app.route('/api/databases/load-demo', methods=['POST'])
+def load_demo_database():
+    """Load the demo database"""
+    demo_path = Path('demo/demo_index.db')
+
+    if not demo_path.exists():
+        return jsonify({'error': 'Demo database not found'}), 404
+
+    # Copy demo to databases folder with unique name
+    db_name = 'index_CISSP_Study_Guide.db'
+    db_path = db_manager.databases_dir / db_name
+
+    # If demo already exists, add suffix
+    counter = 2
+    while db_path.exists():
+        db_name = f'index_CISSP_Study_Guide_{counter}.db'
+        db_path = db_manager.databases_dir / db_name
+        counter += 1
+
+    try:
+        shutil.copy(str(demo_path), str(db_path))
+        session['active_database'] = db_name
+
+        return jsonify({
+            'success': True,
+            'db_name': db_name,
+            'message': 'Demo index loaded successfully'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/databases/archive', methods=['POST'])
 def archive_database():
     """Archive the current database"""
@@ -207,23 +268,18 @@ def archive_database():
         session['active_database'] = databases[0]['db_name']
         return jsonify({
             'success': True,
-            'message': f'Database archived successfully',
+            'message': f'Index archived successfully',
             'switched_to': databases[0]['index_name'],
             'new_db_name': databases[0]['db_name']
         })
     else:
-        # No databases left, create a default one
-        default_db_name = 'index_Book_Index.db'
-        default_path = db_manager.databases_dir / default_db_name
-        new_db = IndexDatabase(str(default_path))
-        new_db.set_setting('index_name', 'Book Index')
-        session['active_database'] = default_db_name
-
+        # No databases left - don't create a default one
         return jsonify({
             'success': True,
-            'message': f'Database archived successfully. Created new default database.',
-            'switched_to': 'Book Index',
-            'new_db_name': default_db_name
+            'message': f'Index archived successfully. Create a new index to continue.',
+            'switched_to': None,
+            'new_db_name': None,
+            'needs_setup': True
         })
 
 
@@ -231,6 +287,8 @@ def archive_database():
 def get_entries():
     """Get all entries"""
     db = get_current_db()
+    if db is None:
+        return jsonify({'entries': []})
     entries = db.get_all_entries()
     return jsonify({
         'entries': [{'term': term, 'references': refs} for term, refs in entries]
@@ -240,6 +298,8 @@ def get_entries():
 def get_recent_entries():
     """Get most recent entries"""
     db = get_current_db()
+    if db is None:
+        return jsonify({'entries': []})
     limit = request.args.get('limit', 5, type=int)
     entries = db.get_recent_entries(limit)
     return jsonify({
@@ -414,10 +474,76 @@ def import_csv():
         'errors': errors
     })
 
+@app.route('/api/import/notes', methods=['POST'])
+def import_notes():
+    """Import notes from CSV data"""
+    db = get_current_db()
+    data = request.json
+    csv_data = data.get('csv_data', '').strip()
+
+    if not csv_data:
+        return jsonify({'error': 'No CSV data provided'}), 400
+
+    lines = csv_data.split('\n')
+    imported = 0
+    updated = 0
+    errors = []
+
+    for line_num, line in enumerate(lines, 1):
+        line = line.strip()
+        if not line:
+            continue
+
+        # Parse CSV line - find first comma to split term from note
+        # This allows notes to contain commas
+        comma_idx = line.find(',')
+        if comma_idx == -1:
+            errors.append(f"Line {line_num}: Invalid format (expected: term,note)")
+            continue
+
+        term = line[:comma_idx].strip()
+        note = line[comma_idx + 1:].strip()
+
+        if not term:
+            errors.append(f"Line {line_num}: Missing term")
+            continue
+
+        if not note:
+            errors.append(f"Line {line_num}: Missing note")
+            continue
+
+        try:
+            # Check if term exists
+            with sqlite3.connect(db.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('SELECT id, notes FROM terms WHERE term = ? COLLATE NOCASE', (term,))
+                result = cursor.fetchone()
+
+            if result:
+                # Term exists - overwrite note
+                db.update_notes(term, note)
+                updated += 1
+            else:
+                # Term doesn't exist - create it with the note
+                db.update_notes(term, note)
+                imported += 1
+        except Exception as e:
+            errors.append(f"Line {line_num}: {str(e)}")
+
+    return jsonify({
+        'success': True,
+        'message': f'Import complete: {imported} new terms, {updated} updated, {len(errors)} errors',
+        'imported': imported,
+        'skipped': updated,  # Using 'skipped' field to show updated count for compatibility
+        'errors': errors
+    })
+
 @app.route('/api/notes', methods=['GET'])
 def get_notes():
     """Get all notes"""
     db = get_current_db()
+    if db is None:
+        return jsonify({'notes': []})
     notes = db.get_all_notes()
     return jsonify({
         'notes': [{'term': term, 'notes': note} for term, note in notes]
@@ -534,7 +660,7 @@ def export_index(format_type):
 
     # Gather index metadata
     index_name = db.get_setting('index_name') or 'Book Index'
-    color_scheme = db.get_setting('color_scheme') or '#f2849e'
+    color_scheme = db.get_setting('color_scheme') or '#9ca3af'
     books = db.get_all_books()
     custom_properties = db.get_all_custom_properties()
 
@@ -608,8 +734,15 @@ def export_index(format_type):
 def get_settings():
     """Get all settings"""
     db = get_current_db()
+    if db is None:
+        # No database yet - return defaults
+        return jsonify({
+            'index_name': 'Book Index',
+            'color_scheme': '#9ca3af',
+            'no_database': True
+        })
     index_name = db.get_setting('index_name') or 'Book Index'
-    color_scheme = db.get_setting('color_scheme') or '#f2849e'
+    color_scheme = db.get_setting('color_scheme') or '#9ca3af'
     return jsonify({
         'index_name': index_name,
         'color_scheme': color_scheme
@@ -617,7 +750,7 @@ def get_settings():
 
 @app.route('/api/settings/index-name', methods=['POST'])
 def set_index_name():
-    """Set index name"""
+    """Set index name and rename database file to match"""
     db = get_current_db()
     data = request.json
     name = data.get('name', '').strip()
@@ -626,7 +759,32 @@ def set_index_name():
         return jsonify({'error': 'Name is required'}), 400
 
     try:
+        # Get current database filename
+        old_db_name = session.get('active_database')
+
+        # Update the index name in the database first
         db.set_setting('index_name', name)
+
+        # Now rename the database file to match
+        if old_db_name:
+            success, new_db_name, error = db_manager.rename_database(old_db_name, name)
+
+            if success and new_db_name != old_db_name:
+                # Update session to point to new filename
+                session['active_database'] = new_db_name
+                return jsonify({
+                    'success': True,
+                    'message': 'Index name saved and file renamed',
+                    'new_db_name': new_db_name
+                })
+            elif not success and error:
+                # Name was saved but file rename failed - still a partial success
+                return jsonify({
+                    'success': True,
+                    'message': f'Index name saved (file rename skipped: {error})',
+                    'warning': error
+                })
+
         return jsonify({'success': True, 'message': 'Index name saved'})
     except Exception as e:
         return jsonify({'error': str(e)}), 400
@@ -678,6 +836,8 @@ def clear_database():
 def get_custom_properties():
     """Get all custom properties"""
     db = get_current_db()
+    if db is None:
+        return jsonify({'properties': []})
     properties = db.get_all_custom_properties()
     return jsonify({
         'properties': [{
@@ -762,6 +922,8 @@ def reorder_custom_properties():
 def get_books():
     """Get all books"""
     db = get_current_db()
+    if db is None:
+        return jsonify({'books': []})
     books = db.get_all_books()
     return jsonify({
         'books': [{'book_number': num, 'book_name': name, 'page_count': pages}
@@ -846,11 +1008,97 @@ def delete_book():
         return jsonify({'error': 'Book number is required'}), 400
 
     try:
+        # Delete book custom properties first
+        db.delete_book_custom_properties(book_number)
         deleted = db.delete_book(book_number)
         if deleted:
             return jsonify({'success': True, 'message': f'Book {book_number} and all associated data deleted'})
         else:
             return jsonify({'error': 'Book not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+# Book Custom Properties endpoints
+@app.route('/api/books/<book_number>/properties', methods=['GET'])
+def get_book_properties(book_number):
+    """Get all custom properties for a book"""
+    db = get_current_db()
+    try:
+        properties = db.get_book_custom_properties(int(book_number))
+        return jsonify({
+            'properties': [
+                {
+                    'id': p[0],
+                    'property_name': p[1],
+                    'property_value': p[2],
+                    'display_order': p[3]
+                }
+                for p in properties
+            ]
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/api/books/<book_number>/properties', methods=['POST'])
+def add_book_property(book_number):
+    """Add a custom property for a book"""
+    db = get_current_db()
+    data = request.json
+    property_name = data.get('property_name', '').strip()
+    property_value = data.get('property_value', '').strip()
+
+    if not property_name or not property_value:
+        return jsonify({'error': 'Property name and value are required'}), 400
+
+    try:
+        property_id = db.add_book_custom_property(int(book_number), property_name, property_value)
+        return jsonify({'success': True, 'id': property_id})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/api/books/properties/<int:property_id>', methods=['PUT'])
+def update_book_property(property_id):
+    """Update a book custom property"""
+    db = get_current_db()
+    data = request.json
+    property_name = data.get('property_name', '').strip()
+    property_value = data.get('property_value', '').strip()
+
+    if not property_name or not property_value:
+        return jsonify({'error': 'Property name and value are required'}), 400
+
+    try:
+        updated = db.update_book_custom_property(property_id, property_name, property_value)
+        if updated:
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': 'Property not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/api/books/properties/<int:property_id>', methods=['DELETE'])
+def delete_book_property(property_id):
+    """Delete a book custom property"""
+    db = get_current_db()
+    try:
+        deleted = db.delete_book_custom_property(property_id)
+        if deleted:
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': 'Property not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/api/books/<book_number>/properties/reorder', methods=['POST'])
+def reorder_book_properties(book_number):
+    """Reorder custom properties for a book"""
+    db = get_current_db()
+    data = request.json
+    property_ids = data.get('property_ids', [])
+
+    try:
+        db.reorder_book_custom_properties(int(book_number), property_ids)
+        return jsonify({'success': True})
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
@@ -944,6 +1192,382 @@ def remove_gap_exclusion():
         return jsonify({'error': f'Invalid page range: {str(e)}'}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 400
+
+# AI Term Enrichment endpoints
+@app.route('/api/ai/settings', methods=['GET'])
+def get_ai_settings():
+    """Get AI settings"""
+    db = get_current_db()
+    if db is None:
+        return jsonify({
+            'enabled': False,
+            'provider': '',
+            'has_key': False
+        })
+
+    enabled = db.get_setting('ai_enabled') == 'true'
+    provider = db.get_setting('ai_provider') or ''
+    api_key = db.get_setting('ai_api_key')
+
+    return jsonify({
+        'enabled': enabled,
+        'provider': provider,
+        'has_key': bool(api_key)
+    })
+
+@app.route('/api/ai/settings', methods=['POST'])
+def save_ai_settings():
+    """Save AI settings"""
+    db = get_current_db()
+    if db is None:
+        return jsonify({'error': 'No database selected'}), 400
+
+    data = request.json
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    enabled = data.get('enabled', False)
+    provider = data.get('provider', '')
+    api_key = data.get('api_key')
+    clear_key = data.get('clear_key', False)
+
+    db.set_setting('ai_enabled', 'true' if enabled else 'false')
+    db.set_setting('ai_provider', provider)
+
+    # Clear API key if requested
+    if clear_key:
+        db.set_setting('ai_api_key', '')
+    # Only update API key if provided
+    elif api_key:
+        db.set_setting('ai_api_key', api_key)
+
+    return jsonify({
+        'success': True,
+        'message': 'AI settings saved'
+    })
+
+@app.route('/api/ai/validate-key', methods=['POST'])
+def validate_ai_key():
+    """Validate an AI API key by making a minimal API call"""
+    data = request.json
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    provider = data.get('provider')
+    api_key = data.get('api_key')
+
+    if not provider:
+        return jsonify({'error': 'No provider specified'}), 400
+    if not api_key:
+        return jsonify({'error': 'No API key provided'}), 400
+
+    try:
+        if provider == 'anthropic':
+            try:
+                import anthropic
+            except ImportError:
+                return jsonify({'error': 'anthropic package not installed'}), 400
+
+            client = anthropic.Anthropic(api_key=api_key)
+            # Make a minimal API call to validate the key
+            message = client.messages.create(
+                model="claude-haiku-4-20250514",
+                max_tokens=10,
+                messages=[{"role": "user", "content": "Hi"}]
+            )
+            return jsonify({'valid': True, 'message': 'API key is valid'})
+
+        elif provider == 'openai':
+            try:
+                import openai
+            except ImportError:
+                return jsonify({'error': 'openai package not installed'}), 400
+
+            client = openai.OpenAI(api_key=api_key)
+            # Make a minimal API call to validate the key
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                max_tokens=10,
+                messages=[{"role": "user", "content": "Hi"}]
+            )
+            return jsonify({'valid': True, 'message': 'API key is valid'})
+
+        else:
+            return jsonify({'error': f'Unknown provider: {provider}'}), 400
+
+    except Exception as e:
+        error_msg = str(e)
+        # Check for common authentication errors
+        if 'invalid' in error_msg.lower() or 'auth' in error_msg.lower() or 'key' in error_msg.lower():
+            return jsonify({'valid': False, 'message': 'Invalid API key'})
+        return jsonify({'valid': False, 'message': f'Validation failed: {error_msg}'})
+
+@app.route('/api/ai/prompts', methods=['GET'])
+def get_ai_prompts():
+    """Get AI prompts configuration"""
+    import json
+    prompts_path = os.path.join(app.static_folder, 'ai_prompts.json')
+    try:
+        with open(prompts_path, 'r') as f:
+            prompts_data = json.load(f)
+        return jsonify(prompts_data)
+    except FileNotFoundError:
+        return jsonify({'error': 'Prompts file not found'}), 404
+    except json.JSONDecodeError as e:
+        return jsonify({'error': f'Invalid JSON: {str(e)}'}), 500
+
+@app.route('/api/ai/terms', methods=['GET'])
+def get_ai_terms():
+    """Get terms for AI enrichment, optionally filtering for terms without notes"""
+    db = get_current_db()
+    without_notes = request.args.get('without_notes', 'false').lower() == 'true'
+
+    if without_notes:
+        terms = db.get_terms_without_notes()
+        return jsonify({
+            'terms': [
+                {
+                    'id': t[0],
+                    'term': t[1]
+                }
+                for t in terms
+            ]
+        })
+    else:
+        terms = db.get_all_terms_for_enrichment()
+        return jsonify({
+            'terms': [
+                {
+                    'id': t[0],
+                    'term': t[1],
+                    'description': t[2],
+                    'is_tool': t[3]
+                }
+                for t in terms
+            ]
+        })
+
+@app.route('/api/ai/enrich', methods=['POST'])
+def enrich_terms():
+    """Enrich terms using AI API"""
+    import json as json_module
+
+    db = get_current_db()
+    if db is None:
+        return jsonify({'error': 'No database selected'}), 400
+
+    # Get API settings from database
+    provider = db.get_setting('ai_provider')
+    api_key = db.get_setting('ai_api_key')
+
+    if not provider:
+        return jsonify({'error': 'No AI provider selected. Please select a provider in AI settings.'}), 400
+
+    if not api_key:
+        return jsonify({'error': 'API key not configured. Please save your API key in AI settings.'}), 400
+
+    # Get terms without notes to enrich
+    terms = db.get_terms_without_notes()
+
+    if not terms:
+        return jsonify({'message': 'No terms without notes to enrich', 'enriched': 0})
+
+    # Load prompt configuration from JSON file
+    prompts_path = os.path.join(app.static_folder, 'ai_prompts.json')
+    try:
+        with open(prompts_path, 'r') as f:
+            prompts_config = json_module.load(f)
+    except (FileNotFoundError, json_module.JSONDecodeError):
+        return jsonify({'error': 'Could not load AI prompts configuration'}), 500
+
+    if provider not in prompts_config.get('prompts', {}):
+        return jsonify({'error': f'No prompt configured for provider: {provider}'}), 400
+
+    provider_config = prompts_config['prompts'][provider]
+
+    # Build prompt with term list
+    term_prefix = prompts_config.get('term_prefix', '- ')
+    term_separator = prompts_config.get('term_list_separator', '\n')
+    term_list = term_separator.join(f"{term_prefix}{t[1]}" for t in terms)
+
+    # Get index name for $course_title
+    index_name = db.get_setting('index_name') or 'Untitled Index'
+
+    # Build the full prompt with replacements
+    prompt_template = provider_config.get('prompt', '')
+    model_name = provider_config.get('model', '')
+    prompt = prompt_template.replace('$course_title', index_name).replace('$model', model_name)
+    prompt = prompt + '\n' + term_list
+
+    try:
+        if provider == 'anthropic':
+            try:
+                import anthropic
+            except ImportError:
+                return jsonify({'error': 'anthropic package not installed. Run: pip install anthropic'}), 400
+
+            client = anthropic.Anthropic(api_key=api_key)
+            message = client.messages.create(
+                model="claude-haiku-4-20250514",  # Cost-effective model
+                max_tokens=4096,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            response_text = message.content[0].text
+
+        elif provider == 'openai':
+            try:
+                import openai
+            except ImportError:
+                return jsonify({'error': 'openai package not installed. Run: pip install openai'}), 400
+
+            client = openai.OpenAI(api_key=api_key)
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",  # Cost-effective model
+                max_tokens=4096,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            response_text = response.choices[0].message.content
+
+        else:
+            return jsonify({'error': f'Unknown provider: {provider}'}), 400
+
+        # Parse CSV response and update notes
+        enriched_count = 0
+        term_map = {t[1].lower(): t[0] for t in terms}
+
+        # Parse CSV response
+        import csv
+        import io
+        reader = csv.reader(io.StringIO(response_text))
+        header_skipped = False
+
+        for row in reader:
+            if len(row) >= 2:
+                # Skip header row
+                if not header_skipped and row[0].lower() == 'term':
+                    header_skipped = True
+                    continue
+                header_skipped = True
+
+                term_name = row[0].strip()
+                description = row[1].strip()
+
+                # Find matching term and update notes
+                term_id = term_map.get(term_name.lower())
+                if term_id:
+                    db.update_notes(term_name, description)
+                    enriched_count += 1
+
+        return jsonify({
+            'success': True,
+            'message': f'Enriched {enriched_count} terms with notes',
+            'enriched': enriched_count
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/ai/import', methods=['POST'])
+def import_ai_data():
+    """Import AI enrichment data from pasted text"""
+    db = get_current_db()
+    data = request.json
+    if not data or 'text' not in data:
+        return jsonify({'error': 'No text provided'}), 400
+
+    response_text = data['text']
+
+    # Get all terms for matching
+    all_terms = db.get_all_terms_for_enrichment()
+    term_map = {t[1].lower(): t[0] for t in all_terms}
+
+    # Parse response
+    enriched_count = 0
+    blocks = response_text.split('---')
+    for block in blocks:
+        block = block.strip()
+        if not block:
+            continue
+
+        term_match = re.search(r'TERM:\s*(.+)', block, re.IGNORECASE)
+        desc_match = re.search(r'DESCRIPTION:\s*(.+)', block, re.IGNORECASE)
+        tool_match = re.search(r'TOOL:\s*(Yes|No)', block, re.IGNORECASE)
+
+        if term_match and desc_match and tool_match:
+            term_name = term_match.group(1).strip()
+            description = desc_match.group(1).strip()
+            is_tool = tool_match.group(1).lower() == 'yes'
+
+            term_id = term_map.get(term_name.lower())
+            if term_id:
+                db.update_term_ai_data(term_id, description, is_tool)
+                enriched_count += 1
+
+    return jsonify({
+        'success': True,
+        'message': f'Imported {enriched_count} term descriptions',
+        'enriched': enriched_count
+    })
+
+@app.route('/api/ai/export', methods=['GET'])
+def export_ai_data():
+    """Export AI enrichment data as CSV"""
+    db = get_current_db()
+    terms = db.get_all_terms_for_enrichment()
+
+    # Build CSV content
+    lines = ['Term,Description,Tool']
+    for term_id, term, description, is_tool in terms:
+        desc_escaped = (description or '').replace('"', '""')
+        tool_str = 'Yes' if is_tool == 1 else ('No' if is_tool == 0 else '')
+        lines.append(f'"{term}","{desc_escaped}","{tool_str}"')
+
+    content = '\n'.join(lines)
+
+    # Create temp file
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+        f.write(content)
+        temp_path = f.name
+
+    return send_file(
+        temp_path,
+        as_attachment=True,
+        download_name='term_descriptions.csv',
+        mimetype='text/csv'
+    )
+
+@app.route('/api/ai/copy-prompt', methods=['GET'])
+def get_copy_prompt():
+    """Get terms formatted as a prompt for manual copy/paste workflow"""
+    db = get_current_db()
+    data = request.args
+    unenriched_only = data.get('unenriched', 'false').lower() == 'true'
+
+    if unenriched_only:
+        terms = db.get_unenriched_terms()
+        term_list = '\n'.join(f"- {t[1]}" for t in terms)
+    else:
+        terms = db.get_all_terms_for_enrichment()
+        term_list = '\n'.join(f"- {t[1]}" for t in terms)
+
+    prompt = f"""For each term below, provide:
+1. A brief description (1-2 sentences) covering the concept or primary purpose
+2. Whether it's a tool (Yes/No)
+
+Terms:
+{term_list}
+
+Respond in this exact format for each term:
+TERM: [term name]
+DESCRIPTION: [brief description]
+TOOL: [Yes/No]
+---"""
+
+    return jsonify({
+        'prompt': prompt,
+        'term_count': len(terms)
+    })
+
 
 if __name__ == '__main__':
     print("=" * 60)

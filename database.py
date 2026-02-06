@@ -14,6 +14,7 @@ REQUIRED_TABLES = {
     'books': ['id', 'book_number', 'book_name', 'page_count', 'created_at'],
     'settings': ['key', 'value'],
     'custom_properties': ['id', 'property_name', 'property_value', 'display_order', 'created_at'],
+    'book_custom_properties': ['id', 'book_number', 'property_name', 'property_value', 'display_order', 'created_at'],
     'gap_exclusions': ['id', 'book_number', 'page_start', 'page_end', 'created_at']
 }
 
@@ -121,6 +122,48 @@ class DatabaseManager:
 
         return db
 
+    def rename_database(self, old_db_name: str, new_index_name: str) -> Tuple[bool, str, Optional[str]]:
+        """
+        Rename a database file to match the new index name.
+        Returns: (success, new_db_name, error_message)
+        """
+        old_path = self.databases_dir / old_db_name
+        if not old_path.exists():
+            return False, old_db_name, "Database file not found"
+
+        # Generate new filename from index name
+        new_db_name = sanitize_db_name(new_index_name)
+        new_path = self.databases_dir / new_db_name
+
+        # If the filename hasn't changed, nothing to do
+        if old_db_name == new_db_name:
+            return True, old_db_name, None
+
+        # Check if target filename already exists
+        if new_path.exists():
+            # Try adding a number suffix to make it unique
+            base_name = new_db_name.replace('.db', '')
+            counter = 1
+            while new_path.exists() and counter < 100:
+                new_db_name = f"{base_name}_{counter}.db"
+                new_path = self.databases_dir / new_db_name
+                counter += 1
+
+            if new_path.exists():
+                return False, old_db_name, "Could not find unique filename"
+
+        # Remove from cache if present (to release any file handles)
+        if old_db_name in self.cache:
+            del self.cache[old_db_name]
+
+        # Rename the file
+        try:
+            old_path.rename(new_path)
+        except OSError as e:
+            return False, old_db_name, f"Failed to rename file: {str(e)}"
+
+        return True, new_db_name, None
+
     def import_database(self, uploaded_file, filename: str) -> Tuple[bool, str, Optional[str]]:
         """
         Import uploaded .db file
@@ -226,7 +269,15 @@ class IndexDatabase:
             columns = [column[1] for column in cursor.fetchall()]
             if 'notes' not in columns:
                 cursor.execute('ALTER TABLE terms ADD COLUMN notes TEXT DEFAULT ""')
-            
+
+            # Add AI enrichment columns if they don't exist
+            if 'ai_description' not in columns:
+                cursor.execute('ALTER TABLE terms ADD COLUMN ai_description TEXT')
+            if 'is_tool' not in columns:
+                cursor.execute('ALTER TABLE terms ADD COLUMN is_tool INTEGER')
+            if 'ai_enriched_at' not in columns:
+                cursor.execute('ALTER TABLE terms ADD COLUMN ai_enriched_at TIMESTAMP')
+
             # Create references table
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS page_references (
@@ -292,6 +343,19 @@ class IndexDatabase:
                     property_value TEXT NOT NULL,
                     display_order INTEGER NOT NULL DEFAULT 0,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+
+            # Create book_custom_properties table
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS book_custom_properties (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    book_number INTEGER NOT NULL,
+                    property_name TEXT NOT NULL,
+                    property_value TEXT NOT NULL,
+                    display_order INTEGER NOT NULL DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (book_number) REFERENCES books(book_number)
                 )
             ''')
 
@@ -752,6 +816,8 @@ class IndexDatabase:
 
         for book_number, book_name, page_count in books:
             if not page_count or page_count <= 0:
+                # Include book but with empty gap analysis data
+                results.append((book_number, book_name, 0, [], [], 0))
                 continue
 
             # Get all references for this book
@@ -973,3 +1039,165 @@ class IndexDatabase:
                 ''', (order, property_id))
             conn.commit()
             return True
+
+    # Book Custom Properties Methods
+    def add_book_custom_property(self, book_number: int, property_name: str, property_value: str) -> int:
+        """
+        Add a custom property for a specific book
+        Returns the ID of the added property
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            # Get the next display order for this book
+            cursor.execute(
+                'SELECT COALESCE(MAX(display_order), -1) + 1 FROM book_custom_properties WHERE book_number = ?',
+                (book_number,)
+            )
+            next_order = cursor.fetchone()[0]
+
+            cursor.execute('''
+                INSERT INTO book_custom_properties (book_number, property_name, property_value, display_order)
+                VALUES (?, ?, ?, ?)
+            ''', (book_number, property_name, property_value, next_order))
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_book_custom_properties(self, book_number: int) -> List[Tuple[int, str, str, int]]:
+        """
+        Get all custom properties for a specific book ordered by display_order
+        Returns list of (id, property_name, property_value, display_order) tuples
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT id, property_name, property_value, display_order
+                FROM book_custom_properties
+                WHERE book_number = ?
+                ORDER BY display_order
+            ''', (book_number,))
+            return cursor.fetchall()
+
+    def update_book_custom_property(self, property_id: int, property_name: str, property_value: str) -> bool:
+        """
+        Update a book custom property
+        Returns True if updated, False if not found
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE book_custom_properties
+                SET property_name = ?, property_value = ?
+                WHERE id = ?
+            ''', (property_name, property_value, property_id))
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def delete_book_custom_property(self, property_id: int) -> bool:
+        """
+        Delete a book custom property
+        Returns True if deleted, False if not found
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM book_custom_properties WHERE id = ?', (property_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def reorder_book_custom_properties(self, book_number: int, property_ids: List[int]) -> bool:
+        """
+        Reorder custom properties for a book based on the provided list of IDs
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            for order, property_id in enumerate(property_ids):
+                cursor.execute('''
+                    UPDATE book_custom_properties
+                    SET display_order = ?
+                    WHERE id = ? AND book_number = ?
+                ''', (order, property_id, book_number))
+            conn.commit()
+            return True
+
+    def delete_book_custom_properties(self, book_number: int) -> bool:
+        """
+        Delete all custom properties for a book (used when deleting a book)
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM book_custom_properties WHERE book_number = ?', (book_number,))
+            conn.commit()
+            return True
+
+    def get_all_terms_for_enrichment(self) -> List[Tuple[int, str, Optional[str], Optional[int]]]:
+        """
+        Get all terms for AI enrichment
+        Returns list of (id, term, ai_description, is_tool) tuples
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT id, term, ai_description, is_tool
+                FROM terms
+                ORDER BY term COLLATE NOCASE
+            ''')
+            return cursor.fetchall()
+
+    def get_unenriched_terms(self) -> List[Tuple[int, str]]:
+        """
+        Get terms that haven't been enriched yet
+        Returns list of (id, term) tuples
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT id, term
+                FROM terms
+                WHERE ai_description IS NULL
+                ORDER BY term COLLATE NOCASE
+            ''')
+            return cursor.fetchall()
+
+    def get_terms_without_notes(self) -> List[Tuple[int, str]]:
+        """
+        Get terms that don't have notes
+        Returns list of (id, term) tuples
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT id, term
+                FROM terms
+                WHERE notes IS NULL OR notes = ''
+                ORDER BY term COLLATE NOCASE
+            ''')
+            return cursor.fetchall()
+
+    def update_term_ai_data(self, term_id: int, description: str, is_tool: bool) -> bool:
+        """
+        Update AI enrichment data for a term
+        Returns True if updated successfully
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE terms
+                SET ai_description = ?, is_tool = ?, ai_enriched_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ''', (description, 1 if is_tool else 0, term_id))
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def clear_term_ai_data(self, term_id: int) -> bool:
+        """
+        Clear AI enrichment data for a term
+        Returns True if updated successfully
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE terms
+                SET ai_description = NULL, is_tool = NULL, ai_enriched_at = NULL
+                WHERE id = ?
+            ''', (term_id,))
+            conn.commit()
+            return cursor.rowcount > 0
