@@ -1,16 +1,46 @@
 # Index it!
 
-A comprehensive offline application for creating and managing book indexes with both command-line and web interfaces.
+A comprehensive offline application for creating and managing book indexes with both command-line and web interfaces. Built for GIAC/SANS certification exam preparation and anyone working with open-book exams.
 
 ## Features
 
+### Core Features
 - **Offline Operation**: Works completely offline using SQLite database
-- **Dual Interface**: Command-line tool and web interface
+- **Dual Interface**: Command-line tool and modern web interface
 - **Smart Reference Handling**: Automatically manages duplicates and groups references by term
-- **Multiple Export Formats**: LaTeX, Plain Text, and Markdown
+- **Multiple Export Formats**: LaTeX, PDF, Plain Text, and Markdown
 - **Letter-Grouped Display**: Organizes entries alphabetically with letter headings
-- **Search Functionality**: Quick search through index terms
+- **Search Functionality**: Quick search through index terms and notes
 - **Simple Reference Format**: Uses `b:p` for single pages and `b:p-p` for page ranges
+
+### Progress Tracking
+- **Visual Progress Charts**: ApexCharts-powered dashboards showing indexing progress
+  - Overall progress donut chart
+  - Term density by book (terms per 100 pages)
+  - Book completion comparison (stacked bar)
+  - Gap distribution treemap
+- **Summary Statistics**: Total books, pages, indexed pages, and completion percentage
+- **Gap Analysis**: Identify unindexed pages with click-to-add functionality
+- **Page Exclusions**: Mark front matter, blank pages, or irrelevant sections
+
+### Study Tools
+- **Study Mode**: Flashcard-based review with terms on front, notes/references on back
+- **Keyboard Navigation**: Space to flip, N/P for next/previous cards
+- **Notes Support**: Add study notes to any term, displayed in View References
+
+### Book Management
+- **Multiple Books**: Track page counts and custom metadata per book
+- **Custom Metadata**: Add author, publisher, edition, or any custom properties
+- **Drag-to-Reorder**: Organize metadata with intuitive drag and drop
+
+### Organization
+- **Multiple Indexes**: Create, switch between, backup, and archive separate indexes
+- **Collapsible Sections**: Accordion-style organization in Tools and Settings
+- **Customizable Appearance**: Choose from multiple accent colors
+
+### AI Integration (Optional)
+- **AI Note Generation**: Automatically generate study notes using Claude or ChatGPT
+- **API Key Management**: Secure storage of your AI provider credentials
 
 ## Installation
 
@@ -29,6 +59,35 @@ A comprehensive offline application for creating and managing book indexes with 
 2. **That's it!** The SQLite database will be created automatically on first use.
 
 ## Usage
+
+### Web Interface
+
+The web interface provides a user-friendly way to manage your index:
+
+1. **Start the web server:**
+   ```bash
+   python web_app.py
+   ```
+
+2. **Open your browser to:**
+   ```
+   http://localhost:5000
+   ```
+
+3. **Keyboard Shortcuts:**
+   | Key | Action |
+   |-----|--------|
+   | `1-6` | Navigate to tabs (Add Entry, View References, Progress, Books, Tools, Settings) |
+   | `/` | Focus search or term input |
+   | `Esc` | Close modals or menu |
+
+4. **Study Mode Shortcuts:**
+   | Key | Action |
+   |-----|--------|
+   | `Space` | Flip flashcard |
+   | `N` | Next flashcard |
+   | `P` | Previous flashcard |
+   | `Esc` | End study session |
 
 ### Command-Line Interface
 
@@ -86,6 +145,9 @@ python index_cli.py delete "old term"
 # Export to LaTeX format (default)
 python index_cli.py export -f latex -o index.tex
 
+# Export to PDF
+python index_cli.py export -f pdf -o index.pdf
+
 # Export to plain text
 python index_cli.py export -f plain -o index.txt
 
@@ -111,28 +173,6 @@ python index_cli.py -h
 python index_cli.py add -h
 ```
 
-### Web Interface
-
-The web interface provides a user-friendly way to manage your index:
-
-1. **Start the web server:**
-   ```bash
-   python web_app.py
-   ```
-
-2. **Open your browser to:**
-   ```
-   http://localhost:5000
-   ```
-
-3. **Features available in the web interface:**
-   - Add new index entries with validation
-   - View all entries organized by letter
-   - Search for specific terms
-   - Delete entries
-   - Export in multiple formats
-   - Real-time feedback and error handling
-
 ## Reference Format
 
 The application uses a simple format for book and page references:
@@ -148,82 +188,28 @@ Where:
 
 ### LaTeX Format
 
-Produces output styled for LaTeX documents:
+Produces output styled for LaTeX documents with proper escaping of special characters.
 
-```latex
-\begin{theindex}
+### PDF Format
 
-  \indexspace
-  \textbf{A}
-
-  \item artificial intelligence, 1:10, 1:25-28, 2:5
-
-  \indexspace
-  \textbf{B}
-
-  \item backpropagation, 2:45-47
-
-\end{theindex}
-```
-
-This format:
-- Uses `\begin{theindex}` and `\end{theindex}` environments
-- Includes `\indexspace` for letter separation
-- Bold letter headings with `\textbf{}`
-- Automatically escapes LaTeX special characters
+Direct PDF generation with professional formatting, ready to print.
 
 ### Plain Text Format
 
-Produces clean, readable plain text:
-
-```
-============================================================
-                          Index
-============================================================
-Generated: 2025-01-13 14:30:00
-============================================================
-
-A
-----------------------------------------
-  artificial intelligence: 1:10, 1:25-28, 2:5
-
-B
-----------------------------------------
-  backpropagation: 2:45-47
-
-============================================================
-Total entries: 2
-============================================================
-```
+Clean, readable plain text with letter headings and timestamps.
 
 ### Markdown Format
 
-Produces GitHub-flavored Markdown:
-
-```markdown
-# Index
-
-*Generated: 2025-01-13 14:30:00*
-
-## A
-
-- **artificial intelligence**: 1:10, 1:25-28, 2:5
-
-## B
-
-- **backpropagation**: 2:45-47
-
----
-*Total entries: 2*
-```
+GitHub-flavored Markdown for documentation or web publishing.
 
 ## Database Structure
 
-The application uses SQLite with two main tables:
+The application uses SQLite with the following main tables:
 
 ### Terms Table
 - `id`: Primary key
 - `term`: Index term (unique, case-insensitive)
+- `note`: Study notes for the term
 - `created_at`: Timestamp
 
 ### References Table
@@ -234,73 +220,49 @@ The application uses SQLite with two main tables:
 - `page_end`: Ending page (NULL for single pages)
 - `created_at`: Timestamp
 
-The schema ensures:
-- No duplicate terms (case-insensitive)
-- No duplicate references for the same term
-- Orphaned terms are automatically cleaned up when references are deleted
+### Books Table
+- `book_number`: Primary key
+- `book_name`: Name/title of the book
+- `page_count`: Total pages (for gap analysis)
+- `created_at`: Timestamp
 
 ## File Structure
 
 ```
-book_index/
+IndexIt/
 ├── database.py          # Database operations
 ├── formatter.py         # Export formatting
 ├── index_cli.py         # Command-line interface
-├── web_app.py          # Flask web application
+├── web_app.py           # Flask web application
 ├── requirements.txt     # Python dependencies
-├── README.md           # This file
+├── README.md            # This file
+├── QUICKSTART.md        # Quick reference guide
+├── MARKETING.md         # Feature overview
 ├── templates/
-│   └── index.html      # Web interface template
+│   └── index.html       # Web interface template
 ├── static/
-│   ├── style.css       # Styling
-│   └── script.js       # JavaScript functionality
-└── book_index.db       # SQLite database (created on first use)
-```
-
-## Examples
-
-### Creating a Comprehensive Index
-
-```bash
-# Add entries for a multi-volume work
-python index_cli.py add "algorithms" 1:15
-python index_cli.py add "algorithms" 1:45-52
-python index_cli.py add "algorithms" 2:8
-
-python index_cli.py add "binary search" 1:23-25
-python index_cli.py add "data structures" 1:30
-python index_cli.py add "recursion" 2:10-15
-
-# View the index
-python index_cli.py list
-
-# Export to LaTeX
-python index_cli.py export -f latex -o my_index.tex
-```
-
-### Working with Multiple Projects
-
-```bash
-# Project 1: Computer Science textbook
-python index_cli.py -d cs_book.db add "algorithms" 1:10
-python index_cli.py -d cs_book.db export -o cs_index.tex
-
-# Project 2: History book
-python index_cli.py -d history.db add "World War II" 1:45
-python index_cli.py -d history.db export -o history_index.tex
+│   ├── style.css        # Styling
+│   ├── script.js        # JavaScript functionality
+│   ├── logo-icon.jpg    # Application logo
+│   └── favicon.ico      # Browser favicon
+├── demo/
+│   └── demo_index.db    # Demo database
+└── databases/           # User databases (git-ignored)
 ```
 
 ## Tips and Best Practices
 
-1. **Consistent Capitalization**: The application is case-insensitive for terms but preserves the first entry's capitalization. Be consistent!
+1. **Set Page Counts**: Add page counts to books to enable progress tracking and gap analysis.
 
-2. **Broad to Specific**: Use the search function to check if similar terms already exist before adding new ones.
+2. **Use Notes**: Add study notes to terms for flashcard-based review in Study Mode.
 
-3. **Regular Exports**: Export your index regularly to avoid data loss.
+3. **Track Progress**: Check the View Progress tab regularly to identify under-indexed books.
 
-4. **Multiple Databases**: Use separate database files for different projects to keep indexes organized.
+4. **Regular Backups**: Use Settings → Index Management → Backup to save your work.
 
-5. **Backup**: The SQLite database file (`book_index.db`) is your only data store. Back it up regularly!
+5. **Multiple Databases**: Use separate database files for different courses or exams.
+
+6. **Keyboard Shortcuts**: Use number keys 1-6 to quickly switch between tabs.
 
 ## Troubleshooting
 
@@ -318,10 +280,51 @@ python index_cli.py -d history.db export -o history_index.tex
 - Close the web interface before using the CLI on the same database
 - Or use a different database file with the `-d` flag
 
+### Progress charts not showing
+- Ensure page counts are set for books in the Books tab
+- Check browser console for JavaScript errors
+
+## Third-Party Libraries
+
+This project uses the following open-source libraries:
+
+- **[Flask](https://flask.palletsprojects.com/)** - MIT License
+- **[ApexCharts](https://apexcharts.com/)** - ApexCharts Community License (free for individuals, non-profits, educators, and organizations with < $2M annual revenue). See [ApexCharts License](https://apexcharts.com/license/).
+
 ## License
 
-This is free and unencumbered software released into the public domain.
+This project is released under the **MIT License**.
+
+```
+MIT License
+
+Copyright (c) 2025
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+**Note**: ApexCharts (used for progress visualization) has its own license terms. See [ApexCharts License](https://apexcharts.com/license/) for details.
 
 ## Contributing
 
-Suggestions and improvements welcome! This is a standalone offline tool, so it should work without internet connectivity.
+Suggestions and improvements welcome! This is a standalone offline tool designed for exam preparation and study.
+
+## Created For
+
+SANS/GIAC students, certification candidates, and anyone facing open-book exams with massive reference materials.
