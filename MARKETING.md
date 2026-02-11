@@ -128,7 +128,7 @@ Never miss a page with intelligent tracking:
 - **Built-in help** - Keyboard shortcuts and tips accessible anytime
 
 ### 13. **Open Source & Extensible**
-- **AGPL-3.0 License** - Free and open source
+- **CC BY-NC 4.0 License** - Free for non-commercial use
 - **Python codebase** - Easy to understand and customize
 - **Active development** - Built with real GIAC exam prep experience
 - **No vendor lock-in** - Your data is in a standard SQLite database
@@ -217,6 +217,6 @@ Page Sage is that better way. It's the tool I wish I had when I was preparing fo
 
 See `README.md` for complete documentation and `QUICKSTART.md` for quick reference.
 
-**License**: AGPL-3.0 - Free and open source
+**License**: CC BY-NC 4.0 - Free for non-commercial use
 
 **Created for**: SANS/GIAC students, certification candidates, and anyone facing open-book exams with massive reference materials
