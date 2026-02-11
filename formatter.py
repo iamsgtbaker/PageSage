@@ -159,7 +159,7 @@ class IndexFormatter:
             output.append("Empty index")
             output.append("")
             output.append("=" * 60)
-            output.append(f"Created with Index it!  •  {metadata['index_name']}".center(60))
+            output.append(f"Created with Page Sage  •  {metadata['index_name']}".center(60))
             output.append("=" * 60)
             return "\n".join(output)
 
@@ -195,7 +195,7 @@ class IndexFormatter:
         output.append(f"Total entries: {len(entries)}")
         output.append("=" * 60)
         output.append("")
-        output.append(f"Created with Index it!  •  {metadata['index_name']}".center(60))
+        output.append(f"Created with Page Sage  •  {metadata['index_name']}".center(60))
         output.append("=" * 60)
 
         return "\n".join(output)
@@ -242,7 +242,7 @@ class IndexFormatter:
             output.append("*Empty index*")
             output.append("")
             output.append("---")
-            output.append(f"*Created with Index it!  •  {metadata['index_name']}*")
+            output.append(f"*Created with Page Sage  •  {metadata['index_name']}*")
             return "\n".join(output)
 
         # Sort entries with "#" (special chars/numbers) at the end
@@ -276,7 +276,7 @@ class IndexFormatter:
         output.append(f"---")
         output.append(f"*Total entries: {len(entries)}*")
         output.append("")
-        output.append(f"*Created with Index it!  •  {metadata['index_name']}*")
+        output.append(f"*Created with Page Sage  •  {metadata['index_name']}*")
 
         return "\n".join(output)
 
@@ -293,7 +293,7 @@ class IndexFormatter:
             from reportlab.lib.pagesizes import letter, landscape
             from reportlab.lib import colors
             from reportlab.lib.units import inch
-            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, KeepTogether, Table, TableStyle, PageBreak, Image, FrameBreak
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, KeepTogether, Table, TableStyle, PageBreak, Image, FrameBreak, NextPageTemplate
             from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
             from reportlab.lib.enums import TA_LEFT, TA_CENTER
             from reportlab.platypus.doctemplate import PageTemplate, BaseDocTemplate
@@ -321,8 +321,8 @@ class IndexFormatter:
                 # Page number on right
                 canvas.drawRightString(landscape(letter)[0] - 0.5 * inch, 0.3 * inch, str(page_num))
 
-                # Index name and "Created with Index it!" on left
-                footer_text = f"{metadata['index_name']}  •  Created with Index it!"
+                # Index name and "Created with Page Sage" on left
+                footer_text = f"{metadata['index_name']}  •  Created with Page Sage"
                 canvas.drawString(0.5 * inch, 0.3 * inch, footer_text)
 
                 canvas.restoreState()
@@ -337,27 +337,44 @@ class IndexFormatter:
                 bottomMargin=0.5 * inch
             )
 
-            # Calculate frame dimensions for 4 columns
+            # Calculate frame dimensions
             page_width, page_height = landscape(letter)
-            frame_width = (page_width - 1 * inch - 3 * 0.15 * inch) / 4  # subtract margins and gaps
+            usable_width = page_width - 1 * inch  # subtract left and right margins
             frame_height = page_height - 1.25 * inch  # subtract top and bottom margins
+            gap = 0.15 * inch
 
-            # Create 4 frames (columns)
-            frames = []
+            # Cover page: 3 columns (25%, 37.5%, 37.5%)
+            cover_col1_width = usable_width * 0.25 - gap
+            cover_col2_width = usable_width * 0.375 - gap
+            cover_col3_width = usable_width * 0.375 - gap
+
+            cover_frames = [
+                Frame(0.5 * inch, 0.5 * inch, cover_col1_width, frame_height,
+                      leftPadding=6, rightPadding=6, topPadding=6, bottomPadding=6, showBoundary=0),
+                Frame(0.5 * inch + cover_col1_width + gap, 0.5 * inch, cover_col2_width, frame_height,
+                      leftPadding=6, rightPadding=6, topPadding=6, bottomPadding=6, showBoundary=0),
+                Frame(0.5 * inch + cover_col1_width + cover_col2_width + 2 * gap, 0.5 * inch, cover_col3_width, frame_height,
+                      leftPadding=6, rightPadding=6, topPadding=6, bottomPadding=6, showBoundary=0),
+            ]
+
+            # Index pages: 4 equal columns
+            index_frame_width = (usable_width - 3 * gap) / 4
+            index_frames = []
             for i in range(4):
-                x = 0.5 * inch + i * (frame_width + 0.15 * inch)
+                x = 0.5 * inch + i * (index_frame_width + gap)
                 frame = Frame(
                     x, 0.5 * inch,
-                    frame_width, frame_height,
+                    index_frame_width, frame_height,
                     leftPadding=6, rightPadding=6,
                     topPadding=6, bottomPadding=6,
                     showBoundary=0
                 )
-                frames.append(frame)
+                index_frames.append(frame)
 
-            # Create page template with 4 columns and footer
-            template = PageTemplate(id='FourCol', frames=frames, onPage=add_footer)
-            doc.addPageTemplates([template])
+            # Create page templates
+            cover_template = PageTemplate(id='Cover', frames=cover_frames, onPage=add_footer)
+            index_template = PageTemplate(id='FourCol', frames=index_frames, onPage=add_footer)
+            doc.addPageTemplates([cover_template, index_template])
 
             # Styles
             styles = getSampleStyleSheet()
@@ -396,6 +413,16 @@ class IndexFormatter:
                 leftIndent=20
             )
 
+            # Book metadata style (smaller than front content)
+            book_metadata_style = ParagraphStyle(
+                'BookMetadataStyle',
+                parent=styles['Normal'],
+                fontSize=9,
+                spaceAfter=2,
+                leftIndent=20,
+                textColor=colors.HexColor('#666666')
+            )
+
             # Letter heading style (larger and bold)
             heading_style = ParagraphStyle(
                 'LetterHeading',
@@ -422,7 +449,7 @@ class IndexFormatter:
             story = []
 
             # Column 1: Logo and title
-            logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'indexit-logo.jpg')
+            logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'page_sage_mascot.png')
             if os.path.exists(logo_path):
                 try:
                     logo = Image(logo_path, width=2.5 * inch, height=2.5 * inch)
@@ -446,11 +473,19 @@ class IndexFormatter:
 
             # Column 2-3-4: Books section (can overflow across columns)
             if metadata['books']:
-                story.append(Paragraph("Books", front_heading_style))
+                # Only show "Books" heading if multiple books
+                if not metadata.get('single_book'):
+                    story.append(Paragraph("Books", front_heading_style))
                 for book in metadata['books']:
                     page_info = f" ({book['page_count']} pages)" if book['page_count'] else ""
                     story.append(Paragraph(f"<b>Book {book['book_number']}:</b> {self.escape_html(book['book_name'])}{page_info}",
                                          front_content_style))
+                    # Add book custom metadata if present
+                    if book.get('metadata'):
+                        for prop in book['metadata']:
+                            story.append(Paragraph(f"<b>{self.escape_html(prop['name'])}:</b> {self.escape_html(prop['value'])}",
+                                                 book_metadata_style))
+                        story.append(Spacer(1, 0.1 * inch))
                 story.append(Spacer(1, 0.3 * inch))
 
             # Custom properties section (follows books, can overflow)
@@ -461,7 +496,8 @@ class IndexFormatter:
                                          front_content_style))
                 story.append(Spacer(1, 0.3 * inch))
 
-            # Page break before index
+            # Switch to 4-column layout and page break before index
+            story.append(NextPageTemplate('FourCol'))
             story.append(PageBreak())
 
             # Now add index entries
@@ -478,7 +514,7 @@ class IndexFormatter:
 
                     # Add letter heading with grey background
                     heading_para = Paragraph(f"<b>{first_letter}</b>", heading_style)
-                    heading_table = Table([[heading_para]], colWidths=[frame_width - 12])
+                    heading_table = Table([[heading_para]], colWidths=[index_frame_width - 12])
                     heading_table.setStyle(TableStyle([
                         ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f1f5f9')),
                         ('LEFTPADDING', (0, 0), (-1, -1), 6),
@@ -602,19 +638,24 @@ class IndexFormatter:
 
         return output.getvalue()
 
-    def format_notes_pdf(self, notes: List[Tuple[str, str]], output_path: str) -> bool:
+    def format_notes_pdf(self, notes: List[Tuple[str, str]], output_path: str, metadata: dict = None) -> bool:
         """
-        Format notes as a 2-column landscape PDF
+        Format notes as a 2-column landscape PDF with cover page
         Returns True if successful
         """
+        if metadata is None:
+            metadata = {'index_name': 'Notes', 'books': [], 'custom_properties': []}
+
         try:
             from reportlab.lib.pagesizes import letter, landscape
             from reportlab.lib import colors
             from reportlab.lib.units import inch
-            from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
+            from reportlab.platypus import Paragraph, Spacer, Table, TableStyle, PageBreak, Image, FrameBreak, NextPageTemplate
             from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.enums import TA_LEFT, TA_CENTER
             from reportlab.platypus.doctemplate import BaseDocTemplate, PageTemplate
             from reportlab.platypus.frames import Frame
+            import os
 
             if not notes:
                 return False
@@ -628,13 +669,25 @@ class IndexFormatter:
 
             notes = sorted(notes, key=sort_key)
 
-            # Define page number footer function
-            def add_page_number(canvas, doc):
+            # Get accent color from metadata (default to sage green if not provided)
+            accent_color = metadata.get('color_scheme', '#87AE73')
+
+            # Calculate page dimensions early for use in footer
+            page_width, page_height = landscape(letter)
+
+            # Define footer function with index name
+            def add_footer(canvas, doc):
                 canvas.saveState()
                 canvas.setFont('Helvetica', 9)
                 page_num = canvas.getPageNumber()
-                text = f"{page_num}"
-                canvas.drawRightString(landscape(letter)[0] - 0.5 * inch, 0.3 * inch, text)
+
+                # Page number on right
+                canvas.drawRightString(page_width - 0.5 * inch, 0.3 * inch, str(page_num))
+
+                # Index name and "Created with Page Sage" on left
+                footer_text = f"{metadata['index_name']}  •  Created with Page Sage"
+                canvas.drawString(0.5 * inch, 0.3 * inch, footer_text)
+
                 canvas.restoreState()
 
             # Create PDF with landscape orientation
@@ -647,37 +700,106 @@ class IndexFormatter:
                 bottomMargin=0.5 * inch
             )
 
-            # Calculate frame dimensions for 2 columns
-            page_width, page_height = landscape(letter)
-            frame_width = (page_width - 1 * inch - 0.3 * inch) / 2  # subtract margins and gap
+            # Calculate frame dimensions
+            usable_width = page_width - 1 * inch  # subtract left and right margins
             frame_height = page_height - 1.25 * inch  # subtract top and bottom margins
+            gap = 0.15 * inch
 
-            # Create 2 frames (columns)
-            frames = []
+            # Cover page: 3 columns (25%, 37.5%, 37.5%)
+            cover_col1_width = usable_width * 0.25 - gap
+            cover_col2_width = usable_width * 0.375 - gap
+            cover_col3_width = usable_width * 0.375 - gap
+
+            cover_frames = [
+                Frame(0.5 * inch, 0.5 * inch, cover_col1_width, frame_height,
+                      leftPadding=6, rightPadding=6, topPadding=6, bottomPadding=6, showBoundary=0),
+                Frame(0.5 * inch + cover_col1_width + gap, 0.5 * inch, cover_col2_width, frame_height,
+                      leftPadding=6, rightPadding=6, topPadding=6, bottomPadding=6, showBoundary=0),
+                Frame(0.5 * inch + cover_col1_width + cover_col2_width + 2 * gap, 0.5 * inch, cover_col3_width, frame_height,
+                      leftPadding=6, rightPadding=6, topPadding=6, bottomPadding=6, showBoundary=0),
+            ]
+
+            # Notes pages: 2 columns
+            notes_frame_width = (usable_width - gap) / 2
+            notes_frames = []
             for i in range(2):
-                x = 0.5 * inch + i * (frame_width + 0.3 * inch)
+                x = 0.5 * inch + i * (notes_frame_width + gap)
                 frame = Frame(
                     x, 0.5 * inch,
-                    frame_width, frame_height,
+                    notes_frame_width, frame_height,
                     leftPadding=10, rightPadding=10,
                     topPadding=10, bottomPadding=10,
                     showBoundary=0
                 )
-                frames.append(frame)
+                notes_frames.append(frame)
 
-            # Create page template with 2 columns and page numbers
-            template = PageTemplate(id='TwoCol', frames=frames, onPage=add_page_number)
-            doc.addPageTemplates([template])
+            # Create page templates
+            cover_template = PageTemplate(id='Cover', frames=cover_frames, onPage=add_footer)
+            notes_template = PageTemplate(id='TwoCol', frames=notes_frames, onPage=add_footer)
+            doc.addPageTemplates([cover_template, notes_template])
 
             # Styles
             styles = getSampleStyleSheet()
+
+            # Title style for front page
+            title_style = ParagraphStyle(
+                'TitleStyle',
+                parent=styles['Title'],
+                fontSize=24,
+                textColor=colors.HexColor(accent_color),
+                spaceAfter=12,
+                alignment=TA_CENTER,
+                fontName='Helvetica-Bold'
+            )
+
+            # Front page heading style
+            front_heading_style = ParagraphStyle(
+                'FrontHeadingStyle',
+                parent=styles['Heading2'],
+                fontSize=14,
+                textColor=colors.HexColor(accent_color),
+                spaceAfter=8,
+                spaceBefore=12,
+                fontName='Helvetica-Bold'
+            )
+
+            # Front page content style
+            front_content_style = ParagraphStyle(
+                'FrontContentStyle',
+                parent=styles['Normal'],
+                fontSize=11,
+                spaceAfter=6,
+                leftIndent=20
+            )
+
+            # Book metadata style (smaller than front content)
+            book_metadata_style = ParagraphStyle(
+                'BookMetadataStyle',
+                parent=styles['Normal'],
+                fontSize=9,
+                spaceAfter=2,
+                leftIndent=20,
+                textColor=colors.HexColor('#666666')
+            )
+
+            # Letter heading style (for section dividers)
+            letter_heading_style = ParagraphStyle(
+                'LetterHeading',
+                parent=styles['Heading1'],
+                fontSize=14,
+                textColor=colors.HexColor(accent_color),
+                spaceAfter=8,
+                spaceBefore=12,
+                fontName='Helvetica-Bold',
+                keepWithNext=True
+            )
 
             # Term heading style
             term_style = ParagraphStyle(
                 'TermStyle',
                 parent=styles['Heading2'],
                 fontSize=12,
-                textColor=colors.HexColor('#2563eb'),
+                textColor=colors.HexColor(accent_color),
                 spaceAfter=6,
                 spaceBefore=10,
                 fontName='Helvetica-Bold',
@@ -685,7 +807,7 @@ class IndexFormatter:
             )
 
             # Notes text style
-            notes_style = ParagraphStyle(
+            notes_text_style = ParagraphStyle(
                 'NotesStyle',
                 parent=styles['Normal'],
                 fontSize=9,
@@ -697,14 +819,93 @@ class IndexFormatter:
             # Build content
             story = []
 
+            # Column 1: Logo and title
+            logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'page_sage_mascot.png')
+            if os.path.exists(logo_path):
+                try:
+                    logo = Image(logo_path, width=2.5 * inch, height=2.5 * inch)
+                    logo.hAlign = 'CENTER'
+                    story.append(logo)
+                    story.append(Spacer(1, 0.5 * inch))
+                except:
+                    pass  # Skip logo if there's an error loading it
+
+            # Index name with "Notes" subtitle
+            story.append(Paragraph(metadata['index_name'], title_style))
+            story.append(Paragraph("Study Notes", ParagraphStyle('SubtitleStyle', parent=styles['Normal'],
+                                                                  fontSize=16, alignment=TA_CENTER,
+                                                                  textColor=colors.HexColor('#666666'))))
+            story.append(Spacer(1, 0.3 * inch))
+
+            # Generated date
+            story.append(Paragraph(f"<i>Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</i>",
+                                 ParagraphStyle('DateStyle', parent=styles['Normal'], fontSize=10,
+                                              alignment=TA_CENTER, textColor=colors.HexColor('#666666'))))
+
+            # Move to column 2 for Books and Properties
+            story.append(FrameBreak())
+
+            # Column 2-3: Books section (can overflow across columns)
+            if metadata.get('books'):
+                # Only show "Books" heading if multiple books
+                if not metadata.get('single_book'):
+                    story.append(Paragraph("Books", front_heading_style))
+                for book in metadata['books']:
+                    page_info = f" ({book['page_count']} pages)" if book.get('page_count') else ""
+                    story.append(Paragraph(f"<b>Book {book['book_number']}:</b> {self.escape_html(book['book_name'])}{page_info}",
+                                         front_content_style))
+                    # Add book custom metadata if present
+                    if book.get('metadata'):
+                        for prop in book['metadata']:
+                            story.append(Paragraph(f"<b>{self.escape_html(prop['name'])}:</b> {self.escape_html(prop['value'])}",
+                                                 book_metadata_style))
+                        story.append(Spacer(1, 0.1 * inch))
+                story.append(Spacer(1, 0.3 * inch))
+
+            # Custom properties section (follows books, can overflow)
+            if metadata.get('custom_properties'):
+                story.append(Paragraph("Properties", front_heading_style))
+                for prop in metadata['custom_properties']:
+                    story.append(Paragraph(f"<b>{self.escape_html(prop['name'])}:</b> {self.escape_html(prop['value'])}",
+                                         front_content_style))
+                story.append(Spacer(1, 0.3 * inch))
+
+            # Switch to 2-column layout and page break before notes
+            story.append(NextPageTemplate('TwoCol'))
+            story.append(PageBreak())
+
+            # Now add notes entries with letter dividers
+            current_letter = None
+
             for term, note in notes:
+                # Get first letter (normalize special chars and numbers to "#")
+                first_letter = self.normalize_first_letter(term)
+
+                # Add letter heading when we encounter a new letter
+                if first_letter != current_letter:
+                    if current_letter is not None:
+                        story.append(Spacer(1, 0.1 * inch))
+
+                    # Add letter heading with grey background
+                    heading_para = Paragraph(f"<b>{first_letter}</b>", letter_heading_style)
+                    heading_table = Table([[heading_para]], colWidths=[notes_frame_width - 20])
+                    heading_table.setStyle(TableStyle([
+                        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f1f5f9')),
+                        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+                        ('TOPPADDING', (0, 0), (-1, -1), 4),
+                        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                    ]))
+                    story.append(heading_table)
+                    current_letter = first_letter
+
                 # Add term heading
                 story.append(Paragraph(f"<b>{self.escape_html(term)}</b>", term_style))
 
                 # Add notes text
                 # Preserve line breaks in notes
                 note_html = self.escape_html(note).replace('\n', '<br/>')
-                story.append(Paragraph(note_html, notes_style))
+                story.append(Paragraph(note_html, notes_text_style))
 
             # Build PDF
             doc.build(story)

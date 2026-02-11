@@ -1,4 +1,4 @@
-# Index it!
+# Page Sage
 
 A comprehensive offline application for creating and managing book indexes with both command-line and web interfaces. Built for GIAC/SANS certification exam preparation and anyone working with open-book exams.
 
@@ -12,16 +12,6 @@ A comprehensive offline application for creating and managing book indexes with 
 - **Letter-Grouped Display**: Organizes entries alphabetically with letter headings
 - **Search Functionality**: Quick search through index terms and notes
 - **Simple Reference Format**: Uses `b:p` for single pages and `b:p-p` for page ranges
-
-### Progress Tracking
-- **Visual Progress Charts**: ApexCharts-powered dashboards showing indexing progress
-  - Overall progress donut chart
-  - Term density by book (terms per 100 pages)
-  - Book completion comparison (stacked bar)
-  - Gap distribution treemap
-- **Summary Statistics**: Total books, pages, indexed pages, and completion percentage
-- **Gap Analysis**: Identify unindexed pages with click-to-add functionality
-- **Page Exclusions**: Mark front matter, blank pages, or irrelevant sections
 
 ### Study Tools
 - **Study Mode**: Flashcard-based review with terms on front, notes/references on back
@@ -37,6 +27,16 @@ A comprehensive offline application for creating and managing book indexes with 
 - **Multiple Indexes**: Create, switch between, backup, and archive separate indexes
 - **Collapsible Sections**: Accordion-style organization in Tools and Settings
 - **Customizable Appearance**: Choose from multiple accent colors
+
+### Progress Tracking
+- **Visual Progress Charts**: ApexCharts-powered dashboards showing indexing progress
+  - Overall progress donut chart
+  - Term density by book (terms per 100 pages)
+  - Book completion comparison (stacked bar)
+  - Gap distribution treemap
+- **Summary Statistics**: Total books, pages, indexed pages, and completion percentage
+- **Gap Analysis**: Identify unindexed pages with click-to-add functionality
+- **Page Exclusions**: Mark front matter, blank pages, or irrelevant sections
 
 ### AI Integration (Optional)
 - **AI Note Generation**: Automatically generate study notes using Claude or ChatGPT
@@ -229,7 +229,7 @@ The application uses SQLite with the following main tables:
 ## File Structure
 
 ```
-IndexIt/
+PageSage/
 ├── database.py          # Database operations
 ├── formatter.py         # Export formatting
 ├── index_cli.py         # Command-line interface

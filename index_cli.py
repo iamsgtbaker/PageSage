@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Book Index - Command Line Interface
+Page Sage - Command Line Interface
 
 A tool for creating and managing book indexes offline.
 """

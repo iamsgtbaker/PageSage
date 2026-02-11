@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Index it!</title>
+    <title>Page Sage</title>
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
@@ -15,12 +15,11 @@
             <header id="header">
             <div class="header-content">
                 <div>
-                    <span class="logo">
-                        <span class="symbol"><img src="{{ url_for('static', filename='logo-icon.jpg') }}" alt="Index it! Logo" /></span>
-                        <h2>Index it!</h2>
-					</span>
-                    <div style="position: relative;">
-                        <h1 id="indexName" class="index-name-clickable" onclick="showDatabaseSwitcher()">Create and manage your book index offline</h1>
+                    <div class="index-header" style="position: relative;">
+                        <div class="index-title-row">
+                            <img src="{{ url_for('static', filename='page_sage_logo.png') }}" alt="Page Sage Logo" class="index-logo" />
+                            <h1 id="indexName" class="index-name-clickable" onclick="showDatabaseSwitcher()">Create and manage your book index offline</h1>
+                        </div>
 
                         <!-- Database Switcher Dropdown (hidden by default) -->
                         <div id="databaseSwitcher" class="database-switcher" style="display: none;">
@@ -47,8 +46,8 @@
         <div style="text-align: center;">
             <div class="tabs">
                 <button class="tab-button active" onclick="switchTab('add')"><span>Add Entry</span></button>
-                <button class="tab-button" onclick="switchTab('view')"><span>View References</span></button>
-                <button class="tab-button" onclick="switchTab('progress')"><span>View Progress</span></button>
+                <button class="tab-button" onclick="switchTab('view')"><span>View Index</span></button>
+                <button class="tab-button" onclick="switchTab('progress')"><span>My Progress</span></button>
                 <button class="tab-button" onclick="switchTab('books')"><span>Books</span></button>
                 <button class="tab-button" onclick="switchTab('tools')"><span>Tools</span></button>
                 <button class="tab-button" onclick="switchTab('settings')"><span>Settings</span></button>
@@ -57,12 +56,14 @@
 
         <!-- Add Entry Tab -->
         <div id="tab-add" class="tab-content active">
-        <div class="card compact">
-            <h2>Add New Entry</h2>
+        <div class="card">
+            <div class="toolbar">
+                <h2>Add New Entry</h2>
+            </div>
             <div id="message" class="message"></div>
             <form id="addForm">
-                <div class="form-row">
-                    <div class="form-group form-group-term">
+                <div class="form-row" style="margin-bottom: 0.5rem;">
+                    <div class="form-group form-group-term" style="margin-bottom: 1em;">
                         <label for="term">Term:</label>
                         <div class="autocomplete-wrapper">
                             <input type="text" id="term" name="term" required
@@ -70,9 +71,10 @@
                                    autocomplete="off">
                             <div id="autocomplete-list" class="autocomplete-items"></div>
                         </div>
+                        <small style="display: block; margin-top: 0.25rem;">Leave blank to add only a note</small>
                     </div>
 
-                    <div class="form-group form-group-ref">
+                    <div class="form-group form-group-ref" style="margin-bottom: 0;">
                         <label>Reference:</label>
                         <div class="reference-inputs">
                             <select id="book" name="book" class="ref-input book-select">
@@ -87,7 +89,7 @@
                                    placeholder="End" class="ref-input" style="width: 65px;"
                                    pattern="[0-9]*" inputmode="numeric">
                         </div>
-                        <small style="display: block; margin-top: 0.25rem;">Leave blank to add only a note</small>
+                        <small style="display: block; margin-top: 0.25rem;">Select the book, start and end page for this term</small>
                     </div>
                 </div>
 
@@ -124,7 +126,7 @@
             <div id="viewEntriesMessage" class="message"></div>
 
             <!-- Filter Bar -->
-            <div class="filter-bar">
+            <div class="filter-bar" style="flex-wrap: wrap; border-bottom: none; margin-bottom: 0; padding-bottom: 0.5rem;">
                 <div class="form-group" style="margin-bottom: 0;">
                     <label for="bookFilter">Filter by Book:</label>
                     <select id="bookFilter" class="ref-input book-select" style="min-width: 150px;">
@@ -132,13 +134,16 @@
                     </select>
                 </div>
                 <input type="text" id="searchInput" placeholder="Search terms and notes..."
-                       class="search-box">
-                <label class="checkbox-label" style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
-                    <input type="checkbox" id="showNotesCheckbox" checked onchange="toggleNotesDisplay()">
-                    <span>Show Notes</span>
-                </label>
+                       class="search-box" style="min-width: 300px; flex: 1;">
                 <button onclick="refreshEntries()" class="btn btn-secondary">Refresh</button>
+                <button onclick="quickExport()" class="btn btn-primary" title="Export Index as PDF">
+                    <i class="fas fa-download"></i> Export
+                </button>
             </div>
+            <label class="checkbox-label" style="display: flex; align-items: center; gap: 0.5rem; margin: 0; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color); margin-bottom: 1rem;">
+                <input type="checkbox" id="showNotesCheckbox" checked onchange="toggleNotesDisplay()">
+                <span>Show Notes</span>
+            </label>
 
             <!-- Letter Navigation -->
             <div id="letterNav" class="letter-nav">
@@ -158,7 +163,7 @@
             <div class="toolbar">
                 <h2>Indexing Progress</h2>
             </div>
-            <p>Track your indexing completeness by identifying pages that are not yet associated with a reference. This feature requires a page count to be set for each book in the <strong>Books</strong> tab. Click on missing pages to create a reference or exclude them from the analysis.</p>
+            <p style="margin-bottom: 1em;">Track your indexing completeness by identifying pages that are not yet associated with a reference. This feature requires a page count to be set for each book in the <strong>Books</strong> tab. Click on missing pages to create a reference or exclude them from the analysis.</p>
 
             <!-- Summary Stats -->
             <div class="progress-summary-stats">
@@ -180,31 +185,39 @@
                 </div>
             </div>
 
-            <!-- Charts Grid - Row 1 -->
-            <div class="progress-charts-grid">
-                <div class="progress-chart-card">
-                    <h3>Overall Progress</h3>
-                    <p>Distribution of indexed, excluded, and gap pages</p>
-                    <div class="progress-chart-container" id="progressDonutChart"></div>
-                </div>
-                <div class="progress-chart-card">
-                    <h3>Book Completion Comparison</h3>
-                    <p>Breakdown of indexed, excluded, and gap pages for each book</p>
-                    <div class="progress-chart-container" id="progressStackedBarChart"></div>
-                </div>
-            </div>
+            <!-- Progress Statistics Collapsible Card -->
+            <div class="tool-card">
+                <h3 class="collapsible-heading" onclick="toggleProgressSection('charts')">
+                    <span class="collapse-icon">▼</span> Progress Statistics
+                </h3>
+                <div id="chartsContainer" class="collapsible-container">
+                    <!-- Charts Grid - Row 1 -->
+                    <div class="progress-charts-grid">
+                        <div class="progress-chart-card">
+                            <h3>Overall Progress</h3>
+                            <p>Distribution of indexed, excluded, and gap pages</p>
+                            <div class="progress-chart-container" id="progressDonutChart"></div>
+                        </div>
+                        <div class="progress-chart-card">
+                            <h3>Book Completion Comparison</h3>
+                            <p>Breakdown of indexed, excluded, and gap pages for each book</p>
+                            <div class="progress-chart-container" id="progressStackedBarChart"></div>
+                        </div>
+                    </div>
 
-            <!-- Charts Grid - Row 2 -->
-            <div class="progress-charts-grid">
-                <div class="progress-chart-card">
-                    <h3>Term Density by Book</h3>
-                    <p>Terms indexed per 100 pages</p>
-                    <div class="progress-chart-container" id="progressDensityChart"></div>
-                </div>
-                <div class="progress-chart-card">
-                    <h3>Gap Distribution</h3>
-                    <p>Number of gap pages remaining in each book</p>
-                    <div class="progress-chart-container" id="progressTreemapChart"></div>
+                    <!-- Charts Grid - Row 2 -->
+                    <div class="progress-charts-grid">
+                        <div class="progress-chart-card">
+                            <h3>Term Density by Book</h3>
+                            <p>Terms indexed per 100 pages. Lower density suggests the book may need more indexing.</p>
+                            <div class="progress-chart-container" id="progressDensityChart"></div>
+                        </div>
+                        <div class="progress-chart-card">
+                            <h3>Gap Distribution</h3>
+                            <p>Number of gap pages remaining in each book</p>
+                            <div class="progress-chart-container" id="progressTreemapChart"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -215,9 +228,11 @@
         <!-- Books Tab -->
         <div id="tab-books" class="tab-content">
         <div class="card">
-            <h2>Book Management</h2>
+            <div class="toolbar">
+                <h2>Book Management</h2>
+            </div>
             <div id="bookManagementMessage" class="message"></div>
-            <p>Manage the books in your index. Add custom metadata like author, publisher, and theme.</p>
+            <p style="margin-bottom: 1em;">Manage the books in your index. Add custom metadata like author, publisher, and theme.</p>
 
             <div id="booksList" class="books-list"></div>
 
@@ -246,7 +261,41 @@
         <!-- Tools Tab -->
         <div id="tab-tools" class="tab-content">
         <div class="card">
-            <h2>Tools</h2>
+            <div class="toolbar">
+                <h2>Tools</h2>
+            </div>
+            <p style="margin-bottom: 1em;">Export your index, import data from CSV, generate AI-powered notes, or review with flashcards.</p>
+
+            <!-- Export Section -->
+            <div class="tool-card">
+                <h3 class="collapsible-heading" onclick="toggleToolsSection('export')">
+                    <span id="exportToggle">▶</span> Export
+                </h3>
+                <div id="exportContainer" class="collapsible-container collapsed">
+                    <p style="margin-top: 1rem;">Download your index or notes:</p>
+                    <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-top: 0.5rem;">
+                        <select id="exportType" class="filter-select" style="flex: 0 0 100px;">
+                            <option value="index">Index</option>
+                            <option value="notes">Notes</option>
+                        </select>
+                        <select id="exportBook" class="filter-select" style="flex: 0 0 160px;">
+                            <option value="">All Books</option>
+                            <!-- Populated dynamically -->
+                        </select>
+                        <select id="exportFormat" class="filter-select" style="flex: 0 0 130px;">
+                            <option value="pdf">PDF</option>
+                            <option value="plain">Plain Text</option>
+                            <option value="markdown">Markdown</option>
+                            <option value="latex">LaTeX</option>
+                            <option value="csv">CSV</option>
+                            <option value="excel">Excel</option>
+                        </select>
+                        <button onclick="doExport()" class="btn btn-primary">
+                            Export
+                        </button>
+                    </div>
+                </div>
+            </div>
 
             <!-- Import Section -->
             <div class="tool-card">
@@ -291,46 +340,6 @@
                     </div>
 
                     <div id="importResults" class="import-results"></div>
-                </div>
-            </div>
-
-            <!-- Export Section -->
-            <div class="tool-card">
-                <h3 class="collapsible-heading" onclick="toggleToolsSection('export')">
-                    <span id="exportToggle">▶</span> Export
-                </h3>
-                <div id="exportContainer" class="collapsible-container collapsed">
-                    <h4 style="margin-top: 1.5rem;">Export Index</h4>
-                    <p>Download your complete index:</p>
-                    <div style="display: flex; gap: 1rem; align-items: center; margin-top: 0.5rem;">
-                        <select id="indexExportFormat" class="filter-select" style="flex: 0 0 200px;">
-                            <option value="pdf">PDF</option>
-                            <option value="plain">Plain Text</option>
-                            <option value="markdown">Markdown</option>
-                            <option value="latex">LaTeX</option>
-                            <option value="csv">CSV</option>
-                            <option value="excel">Excel</option>
-                        </select>
-                        <button onclick="exportIndexFromDropdown()" class="btn btn-primary">
-                            Export Index
-                        </button>
-                    </div>
-
-                    <h4 style="margin-top: 1.5rem;">Export Notes</h4>
-                    <p>Download your notes only:</p>
-                    <div style="display: flex; gap: 1rem; align-items: center; margin-top: 0.5rem;">
-                        <select id="notesExportFormat" class="filter-select" style="flex: 0 0 200px;">
-                            <option value="pdf">PDF</option>
-                            <option value="txt">Plain Text</option>
-                            <option value="markdown">Markdown</option>
-                            <option value="latex">LaTeX</option>
-                            <option value="csv">CSV</option>
-                            <option value="excel">Excel</option>
-                        </select>
-                        <button onclick="exportNotesFromDropdown()" class="btn btn-primary">
-                            Export Notes
-                        </button>
-                    </div>
                 </div>
             </div>
 
@@ -420,7 +429,10 @@
         <!-- Settings Tab -->
         <div id="tab-settings" class="tab-content">
         <div class="card">
-            <h2>Settings</h2>
+            <div class="toolbar">
+                <h2>Settings</h2>
+            </div>
+            <p style="margin-bottom: 1em;">Customize your index name, appearance, AI features, and manage your databases.</p>
 
             <!-- Index Settings Section -->
             <div class="tool-card">
@@ -466,6 +478,7 @@
                     <div class="form-group">
                         <label for="colorScheme">Accent Color:</label>
                         <select id="colorScheme" class="color-scheme-select" onchange="changeColorScheme()">
+                            <option value="#87AE73" data-name="Sage" style="background-color: #87AE73;">Sage</option>
                             <option value="#9ca3af" data-name="Slate Grey" style="background-color: #9ca3af;">Slate Grey</option>
                             <option value="#f2849e" data-name="Coral Pink" style="background-color: #f2849e;">Coral Pink</option>
                             <option value="#84f2de" data-name="Teal" style="background-color: #84f2de;">Teal</option>
@@ -733,35 +746,49 @@
 
         <!-- About Modal -->
         <div id="aboutModal" class="modal">
-            <div class="modal-content">
+            <div class="modal-content" style="max-width: 700px;">
                 <div class="modal-header">
-                    <h2>About Index it!</h2>
+                    <h2>About Page Sage</h2>
                     <button class="modal-close" onclick="closeAboutModal()">&times;</button>
                 </div>
-                <div class="modal-body">
-                    <p style="font-size: 1.1em; margin-bottom: 1em;"><strong>Index it!</strong> - Create and manage your book index offline</p>
+                <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                    <p style="font-size: 1.2em; margin-bottom: 0.5em;"><strong>Page Sage</strong></p>
+                    <p style="font-style: italic; color: var(--secondary-color); margin-bottom: 1em;">Your wise study companion</p>
 
-                    <p style="margin-bottom: 1.5em; color: var(--secondary-color);">
-                        <strong>Version:</strong> 1.0 &nbsp;|&nbsp; <strong>Year:</strong> 2026
+                    <p style="margin-bottom: 1.5em; color: var(--primary-color);">
+                        <strong>Version:</strong> 1.0 &nbsp;|&nbsp; <strong>Year:</strong> 2026 &nbsp;|&nbsp; <strong>License:</strong> AGPL-3.0
                     </p>
 
-                    <p style="font-style: italic; color: var(--primary-color); margin-bottom: 2em;">
-                        Build your exam reference, fast • Your open-book advantage
+                    <h3 style="margin-top: 1.5em; margin-bottom: 0.75em; color: var(--text-color);">The Smart Study Index for Open-Book Exams</h3>
+                    <p style="margin-bottom: 1em;">
+                        Open-book exams aren't tests of memory—they're tests of <strong>preparation and retrieval speed</strong>. The students who pass aren't the ones who memorized everything; they're the ones who built systems to find information in seconds, not minutes.
+                    </p>
+                    <p style="margin-bottom: 1.5em;">
+                        Page Sage is a complete index management system that covers every phase: creation, organization, search, progress tracking, study mode, and professional export.
                     </p>
 
                     <h3 style="margin-top: 1.5em; margin-bottom: 0.75em; color: var(--text-color);">Features</h3>
-                    <ul style="list-style: none; padding-left: 0; margin-bottom: 1.5em;">
-                        <li style="padding: 0.4em 0;">📚 Multi-book index management</li>
-                        <li style="padding: 0.4em 0;">📝 Term tracking with notes</li>
-                        <li style="padding: 0.4em 0;">🔍 Fast search and filtering</li>
-                        <li style="padding: 0.4em 0;">📊 Gap analysis for coverage tracking</li>
-                        <li style="padding: 0.4em 0;">💾 Export to LaTeX, PDF, Markdown, Plain Text</li>
-                        <li style="padding: 0.4em 0;">🌐 Works completely offline</li>
+                    <ul style="list-style: disc; padding-left: 1.5em; margin-bottom: 1.5em;">
+                        <li style="margin-bottom: 0.5em;"><strong>Multi-book Index Management</strong> - Track multiple books with custom metadata (author, publisher, edition)</li>
+                        <li style="margin-bottom: 0.5em;"><strong>Term Tracking with Notes</strong> - Add study notes to any term for flashcard-based review</li>
+                        <li style="margin-bottom: 0.5em;"><strong>Gap Analysis</strong> - Identify unindexed pages and exclude pages from analysis (front matter, etc.)</li>
+                        <li style="margin-bottom: 0.5em;"><strong>Multiple Export Formats</strong> - Export to LaTeX, PDF, Markdown, or plain text</li>
+                        <li style="margin-bottom: 0.5em;"><strong>Progress Charts</strong> - Visual dashboards showing overall progress, term density by book, book completion comparison, and gap distribution</li>
+						<li style="margin-bottom: 0.5em;"><strong>Study Mode</strong> - Flashcard-based review with keyboard shortcuts</li>
+                        <li style="margin-bottom: 0.5em;"><strong>AI Integration</strong> - Optional AI-powered note generation (requires API key)</li>
+                        <li style="margin-bottom: 0.5em;"><strong>Multiple Indexes</strong> - Create, switch between, backup, and archive separate indexes</li>
+                        <li style="margin-bottom: 0.5em;"><strong>Customizable Appearance</strong> - Choose from multiple accent colors</li>
+                        <li style="margin-bottom: 0.5em;"><strong>Works Completely Offline</strong> - No internet required, no tracking, no cloud dependencies</li>
                     </ul>
 
                     <h3 style="margin-top: 1.5em; margin-bottom: 0.75em; color: var(--text-color);">Technology</h3>
                     <p style="margin-bottom: 1em;">
-                        Built with Python Flask, SQLite, and vanilla JavaScript. No frameworks, no tracking, no cloud dependencies.
+                        Built with Python Flask, SQLite, vanilla JavaScript, and ApexCharts for progress visualizations. No frameworks, no tracking, no cloud dependencies.
+                    </p>
+
+                    <h3 style="margin-top: 1.5em; margin-bottom: 0.75em; color: var(--text-color);">Created For</h3>
+                    <p style="margin-bottom: 1em;">
+                        SANS students, GIAC certification candidates, and anyone facing open-book exams with massive reference materials.
                     </p>
 
                     <p style="margin-top: 1.5em; font-size: 0.9em; color: var(--secondary-color);">
@@ -828,37 +855,6 @@
                         </tbody>
                     </table>
 
-                    <h3 style="margin-top: 1.5em; margin-bottom: 1em; color: var(--text-color);">Quick Start Guide</h3>
-
-                    <h4 style="margin-top: 1em; margin-bottom: 0.5em; font-size: 1em; color: var(--primary-color);">1. Add Books</h4>
-                    <p style="margin-bottom: 1em;">Go to the <strong>Books</strong> tab and add your textbooks with their numbers, page counts, and custom metadata (author, publisher, etc.).</p>
-
-                    <h4 style="margin-top: 1em; margin-bottom: 0.5em; font-size: 1em; color: var(--primary-color);">2. Create Index Entries</h4>
-                    <p style="margin-bottom: 1em;">On the <strong>Add Entry</strong> tab, enter terms with book:page references (e.g., "1:42" or "2:15-18" for page ranges).</p>
-
-                    <h4 style="margin-top: 1em; margin-bottom: 0.5em; font-size: 1em; color: var(--primary-color);">3. Add Notes</h4>
-                    <p style="margin-bottom: 1em;">Add study notes to any term. Notes are displayed in the <strong>View References</strong> tab. Use the Show Notes toggle to show/hide notes.</p>
-
-                    <h4 style="margin-top: 1em; margin-bottom: 0.5em; font-size: 1em; color: var(--primary-color);">4. Track Progress</h4>
-                    <p style="margin-bottom: 1em;">The <strong>View Progress</strong> tab shows visual charts of your indexing progress including overall completion, term density, and gap distribution. Click on book cards to see detailed page-level gap analysis.</p>
-
-                    <h4 style="margin-top: 1em; margin-bottom: 0.5em; font-size: 1em; color: var(--primary-color);">5. Study Mode</h4>
-                    <p style="margin-bottom: 1em;">Use <strong>Tools → Study Mode</strong> to review your terms as flashcards. The card shows the term on the front and notes/references on the back.</p>
-
-                    <h4 style="margin-top: 1em; margin-bottom: 0.5em; font-size: 1em; color: var(--primary-color);">6. Export Your Index</h4>
-                    <p style="margin-bottom: 1em;">Use the <strong>Tools</strong> tab to export your index to LaTeX, PDF, Markdown, or plain text formats.</p>
-
-                    <h3 style="margin-top: 1.5em; margin-bottom: 1em; color: var(--text-color);">Features</h3>
-                    <ul style="list-style: disc; padding-left: 1.5em;">
-                        <li style="margin-bottom: 0.5em;"><strong>Progress Charts</strong> - Visual dashboards showing overall progress, term density by book, book completion comparison, and gap distribution</li>
-                        <li style="margin-bottom: 0.5em;"><strong>Collapsible Sections</strong> - Tools and Settings use accordion-style sections for better organization</li>
-                        <li style="margin-bottom: 0.5em;"><strong>Book Metadata</strong> - Add custom properties like author, publisher, or edition to each book with drag-to-reorder support</li>
-                        <li style="margin-bottom: 0.5em;"><strong>Gap Analysis</strong> - Identify unindexed pages and exclude pages from analysis (front matter, etc.)</li>
-                        <li style="margin-bottom: 0.5em;"><strong>AI Integration</strong> - Optional AI-powered note generation (requires API key in Settings)</li>
-                        <li style="margin-bottom: 0.5em;"><strong>Multiple Indexes</strong> - Create, switch between, backup, and archive separate indexes</li>
-                        <li style="margin-bottom: 0.5em;"><strong>Customizable Appearance</strong> - Choose from multiple accent colors in Settings</li>
-                    </ul>
-
                     <h3 style="margin-top: 1.5em; margin-bottom: 1em; color: var(--text-color);">Tips</h3>
                     <ul style="list-style: disc; padding-left: 1.5em;">
                         <li style="margin-bottom: 0.5em;">Use the autocomplete on the term field to quickly reference existing terms</li>
@@ -874,6 +870,105 @@
             </div>
         </div>
 
+        <!-- How to Use Modal -->
+        <div id="howToUseModal" class="modal">
+            <div class="modal-content" style="max-width: 750px;">
+                <div class="modal-header">
+                    <h2>Getting Started with Page Sage</h2>
+                    <button class="modal-close" onclick="closeHowToUseModal()">&times;</button>
+                </div>
+                <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                    <h3 style="margin-top: 0; margin-bottom: 1em; color: var(--text-color);">The Open-Book Exam Challenge</h3>
+                    <p style="margin-bottom: 1em;">
+                        You're sitting for your certification exam. The good news? It's open book—you can bring all your course materials, notes, and references. The bad news? You have limited time to answer challenging questions, and your books contain thousands of pages. Sure you studied, but you will want to double-check your answer, right?
+                    </p>
+                    <p style="margin-bottom: 1.5em;">
+                        <strong>The solution:</strong> Build an index whilst studying that lets you find information in seconds, not minutes. Page Sage helps you create, manage, and export a professional study index.
+                    </p>
+
+                    <h3 style="margin-top: 1.5em; margin-bottom: 1em; color: var(--text-color);">Quick Start Guide</h3>
+
+                    <h4 style="margin-top: 1em; margin-bottom: 0.5em; font-size: 1em; color: var(--secondary-color);">1. Add Books</h4>
+                    <p style="margin-bottom: 1em;">Go to the <strong>Books</strong> tab and add your textbooks with their numbers, page counts, and custom metadata (author, publisher, etc.).</p>
+
+                    <h4 style="margin-top: 1em; margin-bottom: 0.5em; font-size: 1em; color: var(--secondary-color);">2. Create Index Entries</h4>
+                    <p style="margin-bottom: 0.5em;">On the <strong>Add Entry</strong> tab, enter terms with book:page references. Add notes to help you remember key concepts.</p>
+                    <p style="margin-bottom: 1em;">Use <strong>Tools → AI Term Enrichment</strong> to automatically generate study notes for your terms using Claude or ChatGPT.</p>
+
+                    <h4 style="margin-top: 1em; margin-bottom: 0.5em; font-size: 1em; color: var(--secondary-color);">Reference Format</h4>
+                    <p style="margin-bottom: 0.5em;">References use the format <code style="background: var(--hover-color); padding: 0.2em 0.5em; border-radius: 3px;">book:page</code> or <code style="background: var(--hover-color); padding: 0.2em 0.5em; border-radius: 3px;">book:start-end</code> for page ranges.</p>
+                    <ul style="list-style: disc; padding-left: 1.5em; margin-bottom: 1em;">
+                        <li><strong>Book</strong> – Select the book number from the dropdown</li>
+                        <li><strong>Start</strong> – Enter the page number where the term appears</li>
+                        <li><strong>End</strong> – For page ranges, enter the ending page (optional)</li>
+                    </ul>
+                    <p style="margin-bottom: 1em;">
+                        <strong>Examples:</strong><br>
+                        <code style="background: var(--hover-color); padding: 0.2em 0.5em; border-radius: 3px;">1:42</code> → Book 1, page 42<br>
+                        <code style="background: var(--hover-color); padding: 0.2em 0.5em; border-radius: 3px;">2:15-18</code> → Book 2, pages 15 through 18<br>
+                        <code style="background: var(--hover-color); padding: 0.2em 0.5em; border-radius: 3px;">3:100</code> → Book 3, page 100
+                    </p>
+
+                    <h4 style="margin-top: 1em; margin-bottom: 0.5em; font-size: 1em; color: var(--secondary-color);">3. Track Progress</h4>
+                    <p style="margin-bottom: 0.5em;">The <strong>My Progress</strong> tab shows visual charts of your indexing progress. Use gap analysis to identify unindexed pages.</p>
+                    <p style="margin-bottom: 1em;"><strong>Page Exclusions:</strong> Some pages don't need indexing (front matter, blank pages, appendices). Click on a gap range in the progress view and select "Exclude" to mark these pages. Excluded pages won't count against your coverage percentage.</p>
+
+                    <h4 style="margin-top: 1em; margin-bottom: 0.5em; font-size: 1em; color: var(--secondary-color);">4. Study & Review</h4>
+                    <p style="margin-bottom: 1em;">Use <strong>Tools → Study Mode</strong> to review your terms as flashcards before exam day.</p>
+
+                    <h4 style="margin-top: 1em; margin-bottom: 0.5em; font-size: 1em; color: var(--secondary-color);">5. Export Your Index</h4>
+                    <p style="margin-bottom: 1.5em;">Use the <strong>Tools</strong> tab to export your index to PDF, LaTeX, Markdown, or plain text formats.</p>
+
+                    <h3 style="margin-top: 1.5em; margin-bottom: 1em; color: var(--text-color);">Recommended Workflow</h3>
+
+                    <h4 style="margin-top: 1em; margin-bottom: 0.5em; font-size: 1em; color: var(--secondary-color);">During Initial Study</h4>
+                    <ul style="list-style: disc; padding-left: 1.5em; margin-bottom: 1em;">
+                        <li>Use Page Sage during study sessions</li>
+                        <li>When you encounter important terms, tools, or concepts: add them immediately</li>
+                        <li>Add notes explaining key concepts for later review</li>
+                        <li>Continue building your index as you study</li>
+                    </ul>
+
+                    <h4 style="margin-top: 1em; margin-bottom: 0.5em; font-size: 1em; color: var(--secondary-color);">Mid-Study Progress Check</h4>
+                    <ul style="list-style: disc; padding-left: 1.5em; margin-bottom: 1em;">
+                        <li>Open My Progress tab to see visual dashboards</li>
+                        <li>Check which books have the lowest term density</li>
+                        <li>Review gap analysis to find unindexed pages</li>
+                        <li>Use Study Mode flashcards to test your recall</li>
+                    </ul>
+
+                    <h4 style="margin-top: 1em; margin-bottom: 0.5em; font-size: 1em; color: var(--secondary-color);">Practice Tests</h4>
+                    <ul style="list-style: disc; padding-left: 1.5em; margin-bottom: 1em;">
+                        <li>Take practice tests (timed, open-book)</li>
+                        <li>Notice which terms you search for most</li>
+                        <li>Add missing terms you struggled to find</li>
+                    </ul>
+
+                    <h4 style="margin-top: 1em; margin-bottom: 0.5em; font-size: 1em; color: var(--secondary-color);">Final Prep</h4>
+                    <ul style="list-style: disc; padding-left: 1.5em; margin-bottom: 1em;">
+                        <li>Export to PDF and generate a professional index</li>
+                        <li>Print and organize your index</li>
+                        <li>Run through Study Mode one final time</li>
+                        <li>Backup your database for future reference</li>
+                    </ul>
+
+                    <h4 style="margin-top: 1em; margin-bottom: 0.5em; font-size: 1em; color: var(--secondary-color);">Exam Day</h4>
+                    <ul style="list-style: disc; padding-left: 1.5em; margin-bottom: 1.5em;">
+                        <li>Bring your printed Page Sage export</li>
+                        <li>4-second lookup times instead of 2-minute searches</li>
+                        <li>More time for analysis, less time searching</li>
+                    </ul>
+
+                    <p style="margin-top: 1.5em; padding: 1em; background: var(--hover-color); border-radius: 8px; text-align: center;">
+                        <strong>Your exam success doesn't depend on memorization—it depends on preparation and retrieval speed.</strong>
+                    </p>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeHowToUseModal()">Close</button>
+                </div>
+            </div>
+        </div>
+
         <!-- CLI Reference Modal -->
         <div id="cliModal" class="modal">
             <div class="modal-content" style="max-width: 800px;">
@@ -884,7 +979,7 @@
                 <div class="modal-body" style="font-family: 'Source Sans Pro', monospace; max-height: 70vh; overflow-y: auto;">
                     <pre style="background: var(--bg-color); padding: 1.5em; border-radius: 8px; overflow-x: auto; font-size: 0.9em; line-height: 1.6; white-space: pre-wrap; word-wrap: break-word;">
 <strong>NAME</strong>
-    index_cli.py - Command line interface for Index it!
+    index_cli.py - Command line interface for Page Sage
 
 <strong>SYNOPSIS</strong>
     python index_cli.py [-d DATABASE] COMMAND [OPTIONS]
@@ -999,7 +1094,7 @@
 
 <strong>SEE ALSO</strong>
     Web interface: python web_app.py
-    GitHub: https://github.com/iamsgtbaker/IndexIt
+    GitHub: https://github.com/agraham46/PageSage
                     </pre>
                 </div>
                 <div class="modal-actions">
@@ -1157,7 +1252,7 @@
                     <button class="modal-close" onclick="closeImportDatabaseModal()">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <p>Upload an existing Index it! index file (.db)</p>
+                    <p>Upload an existing Page Sage index file (.db)</p>
                     <div id="importDatabaseMessage" class="message"></div>
                     <form id="importDatabaseForm" enctype="multipart/form-data">
                         <div class="form-group">
@@ -1243,7 +1338,7 @@
         <div id="getStartedModal" class="modal">
             <div class="modal-content" style="max-width: 500px;">
                 <div class="modal-header">
-                    <h2>Welcome to Index it!</h2>
+                    <h2>Welcome to Page Sage</h2>
                 </div>
                 <div class="modal-body">
                     <p style="margin-bottom: 1.5em;">Let's crush your open book exam. Choose how you would like to get started:</p>
@@ -1316,7 +1411,11 @@
             </div>
         </div>
         <footer>
-            <h2><span id="rotatingTagline">Build your exam reference, fast</span></h2>
+            <p style="margin: 0; font-size: 0.9em; color: var(--secondary-color);">
+                <strong>Page Sage</strong> - Your wise study companion! |
+                <a href="https://github.com/iamsgtbaker/PageSage/blob/main/LICENSE" target="_blank" rel="noopener" style="color: var(--secondary-color);">AGPL-3.0 License</a> |
+                <a href="https://github.com/iamsgtbaker/PageSage" target="_blank" rel="noopener" style="color: var(--secondary-color);">GitHub</a>
+            </p>
         </footer>
         </div>
     </div>
@@ -1324,22 +1423,24 @@
     <!-- Hamburger Menu Panel (outside wrapper to avoid dimming) -->
     <nav id="menu">
         <div class="inner">
-            <h2>Menu</h2>
+            <h2>Page Sage</h2>
+            <h3><span id="rotatingTagline">Build your exam reference, fast</span></h3>
             <ul>				
                 <!-- Mobile Quick Access (hidden on desktop) -->
                 <li class="mobile-only"><a href="#" onclick="menuNavigate('add'); return false;">Add Entry</a></li>
-                <li class="mobile-only"><a href="#" onclick="menuNavigate('view'); return false;">View References</a></li>
-                <li class="mobile-only"><a href="#" onclick="menuNavigate('progress'); return false;">View Progress</a></li>
+                <li class="mobile-only"><a href="#" onclick="menuNavigate('view'); return false;">View Index</a></li>
+                <li class="mobile-only"><a href="#" onclick="menuNavigate('progress'); return false;">My Progress</a></li>
                 <li class="mobile-only"><a href="#" onclick="menuNavigate('books'); return false;">Books</a></li>
                 <li class="mobile-only"><a href="#" onclick="menuNavigate('tools'); return false;">Tools</a></li>
                 <li class="mobile-only"><a href="#" onclick="menuNavigate('settings'); return false;">Settings</a></li>
 
                 <!-- Info links (all devices) -->
                 <li><a href="#" onclick="showAboutModal(); return false;">About</a></li>
+                <li><a href="#" onclick="showHowToUseModal(); return false;">Getting started</a></li>
                 <li><a href="#" onclick="showHelpModal(); return false;">Help</a></li>
                 <li><a href="#" onclick="showCliModal(); return false;">CLI Reference</a></li>
-                <li><a href="https://github.com/iamsgtbaker/IndexIt" target="_blank" rel="noopener">GitHub</a></li>
-                <li><a href="https://buymeacoffee.com/iamsgtbaker" title="Did Index it! help get your exam pass? Show your appreciation by donating a few bucks." target="_blank" rel="noopener">☕ Buy me a coffee</a></li>
+                <li><a href="https://github.com/iamsgtbaker/PageSage" target="_blank" rel="noopener">GitHub</a></li>
+                <li><a href="https://buymeacoffee.com/iamsgtbaker" title="Did Page Sage help get your exam pass? Show your appreciation by donating a few bucks." target="_blank" rel="noopener">☕ Buy me a coffee</a></li>
             </ul>
         </div>
     </nav>

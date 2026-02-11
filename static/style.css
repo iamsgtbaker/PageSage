@@ -1,4 +1,4 @@
-/* Index it! Stylesheet - Phantom Template Integration */
+/* Page Sage Stylesheet - Phantom Template Integration */
 
 @import url("https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,700,900");
 
@@ -10,10 +10,10 @@
 
 :root {
     --primary-color:  #585858;        /* Phantom dark gray */
-    --secondary-color: #9ca3af;       /* Slate grey accent (default) */
-    --message-success-bg: rgba(156, 163, 175, 0.15); /* Light accent for success messages */
-    --hamburger-hover-icon: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cstyle%3Eline %7B stroke-width: 8px%3B stroke: %239ca3af%3B %7D%3C/style%3E%3Cline x1='0' y1='25' x2='100' y2='25' /%3E%3Cline x1='0' y1='50' x2='100' y2='50' /%3E%3Cline x1='0' y1='75' x2='100' y2='75' /%3E%3C/svg%3E");
-    --close-hover-icon: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cstyle%3Eline %7B stroke-width: 8px%3B stroke: %239ca3af%3B %7D%3C/style%3E%3Cline x1='15' y1='15' x2='85' y2='85' /%3E%3Cline x1='85' y1='15' x2='15' y2='85' /%3E%3C/svg%3E");
+    --secondary-color: #87AE73;       /* Sage green accent (default) */
+    --message-success-bg: rgba(135, 174, 115, 0.15); /* Light accent for success messages */
+    --hamburger-hover-icon: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cstyle%3Eline %7B stroke-width: 8px%3B stroke: %2387AE73%3B %7D%3C/style%3E%3Cline x1='0' y1='25' x2='100' y2='25' /%3E%3Cline x1='0' y1='50' x2='100' y2='50' /%3E%3Cline x1='0' y1='75' x2='100' y2='75' /%3E%3C/svg%3E");
+    --close-hover-icon: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cstyle%3Eline %7B stroke-width: 8px%3B stroke: %2387AE73%3B %7D%3C/style%3E%3Cline x1='15' y1='15' x2='85' y2='85' /%3E%3Cline x1='85' y1='15' x2='15' y2='85' /%3E%3C/svg%3E");
     --success-color: #10b981;
     --error-color: #ef4444;
     --warning-color: #f59e0b;
@@ -25,6 +25,8 @@
     --menu-bg: #585858;              /* Menu background */
     --menu-text: #ffffff;            /* Menu text color */
     --footer-color: #f6f6f6;         /* Footer background */
+    --text-muted: #888888;           /* Muted text color */
+    --input-bg: #f9f9f9;             /* Input background color */
 }
 
 body {
@@ -126,11 +128,8 @@ header {
     display: inline-block;
     border-bottom: 0;
     color: inherit;
-    font-weight: 900;
-    letter-spacing: 0.35em;
-    margin: 0 0 1em 0;
+    margin: 0 0 0.5em 0;
     text-decoration: none;
-    text-transform: uppercase;
 }
 
 .logo > * {
@@ -138,20 +137,21 @@ header {
     vertical-align: middle;
 }
 
-
-.logo .symbol img {
-    display: block;
-    width: 2.5em;
-    height: auto;
+.index-title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
 }
 
-.logo h2 {
-    font-size: 2em;
-    font-weight: 700;
-    line-height: 1.3;
-    letter-spacing: -0.035em;
-    color: var(--secondary-color);
+.index-logo {
+    height: 3.5em;
+    width: auto;
+}
+
+.index-title-row h1 {
     margin: 0;
+    display: flex;
+    align-items: center;
 }
 
 h1 {
@@ -362,41 +362,6 @@ textarea:focus {
 .import-results li {
     padding: 0.25rem 0;
     color: var(--secondary-color);
-}
-
-/* Notes List Styles */
-.notes-list {
-    max-height: 500px;
-    overflow-y: auto;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 1rem;
-}
-
-.note-item {
-    padding: 1rem;
-    margin-bottom: 1rem;
-    border-radius: 6px;
-    background-color: var(--bg-color);
-    transition: background-color 0.2s;
-    cursor: pointer;
-}
-
-.note-item:hover {
-    background-color: var(--hover-color);
-}
-
-.note-term {
-    font-weight: 600;
-    color: var(--primary-color);
-    margin-bottom: 0.5rem;
-    font-size: 1.1rem;
-}
-
-.note-text {
-    color: var(--text-color);
-    white-space: pre-wrap;
-    line-height: 1.6;
 }
 
 /* Settings Styles */
@@ -708,7 +673,7 @@ textarea:focus {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 1rem;
-    margin: 1.5rem 0;
+    margin: 0 0 1.5rem 0;
 }
 
 .progress-stat-card {
@@ -944,6 +909,10 @@ textarea:focus {
 
 .excluded-list {
     margin-top: 0.75rem;
+}
+
+.gap-list.excluded-list {
+    margin-top: 0;
 }
 
 .excluded-list strong {
@@ -1347,7 +1316,7 @@ small {
 .entry-notes {
     margin-top: 0.5rem;
     padding-top: 0.5rem;
-    border-top: 1px dashed var(--border-color);
+    border-top: 1px solid var(--border-color);
     color: var(--text-color);
     font-size: 0.9rem;
     line-height: 1.5;
@@ -1725,7 +1694,14 @@ footer h2 {
     letter-spacing: -0.035em;
     text-transform: uppercase;
     font-size: 2em;
-    margin-bottom: 1em;
+    
+}
+
+#menu > .inner > h3 {
+    font-weight: 500;
+	font-style: italic;
+    margin-top: -0.5em;
+	margin-bottom: 1em;
 }
 
 #menu > .inner > ul {

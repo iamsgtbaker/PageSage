@@ -1,11 +1,8 @@
 // Book Index Manager - JavaScript
 
 let allEntries = [];
-let allNotes = [];
 let searchTimeout = null;
-let notesSearchTimeout = null;
 let selectedLetter = null;
-let selectedNotesLetter = null;
 let currentSearchQuery = '';
 let autocompleteIndex = -1;
 let lastAutocompleteTerm = '';  // Track last autocomplete-selected term
@@ -113,6 +110,17 @@ function closeHelpModal() {
     document.getElementById('helpModal').classList.remove('show');
 }
 
+function showHowToUseModal() {
+    menuHide();
+    setTimeout(() => {
+        document.getElementById('howToUseModal').classList.add('show');
+    }, 350);
+}
+
+function closeHowToUseModal() {
+    document.getElementById('howToUseModal').classList.remove('show');
+}
+
 function showCliModal() {
     menuHide();
     setTimeout(() => {
@@ -197,6 +205,14 @@ document.addEventListener('DOMContentLoaded', function() {
     // Check if this is a new database that needs setup
     checkNeedsSetup();
 
+    // Check if we should show the How to Use modal (after new index creation)
+    if (localStorage.getItem('showHowToUse') === 'true') {
+        localStorage.removeItem('showHowToUse');
+        setTimeout(() => {
+            document.getElementById('howToUseModal').classList.add('show');
+        }, 500);
+    }
+
     // Close database switcher when clicking outside
     document.addEventListener('click', function(event) {
         const switcher = document.getElementById('databaseSwitcher');
@@ -238,6 +254,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'addBookModal': closeAddBookModal,
         'aboutModal': closeAboutModal,
         'helpModal': closeHelpModal,
+        'howToUseModal': closeHowToUseModal,
         'cliModal': closeCliModal,
         'csvHelpModal': closeCsvHelpModal,
         'aiHelpModal': closeAiHelpModal,
@@ -410,7 +427,7 @@ function toggleToolsSection(section, savePreference = true) {
 // Restore last opened tool section
 function restoreLastOpenedTool() {
     const lastTool = localStorage.getItem('lastOpenedTool');
-    if (lastTool && ['import', 'export', 'gaps', 'ai'].includes(lastTool)) {
+    if (lastTool && ['import', 'export', 'ai', 'study'].includes(lastTool)) {
         toggleToolsSection(lastTool, false);
     }
 }
@@ -458,16 +475,19 @@ function restoreLastOpenedSetting() {
     }
 }
 
-// Export index from dropdown
-function exportIndexFromDropdown() {
-    const format = document.getElementById('indexExportFormat').value;
-    exportIndex(format);
-}
+// Toggle progress section (charts)
+function toggleProgressSection(section) {
+    const container = document.getElementById(`${section}Container`);
+    const heading = container.previousElementSibling;
+    const icon = heading.querySelector('.collapse-icon');
 
-// Export notes from dropdown
-function exportNotesFromDropdown() {
-    const format = document.getElementById('notesExportFormat').value;
-    exportNotes(format);
+    if (container.classList.contains('collapsed')) {
+        container.classList.remove('collapsed');
+        icon.textContent = '▼';
+    } else {
+        container.classList.add('collapsed');
+        icon.textContent = '▶';
+    }
 }
 
 // Load recent entries
@@ -587,8 +607,12 @@ async function loadEntries() {
 // Refresh entries
 function refreshEntries() {
     document.getElementById('searchInput').value = '';
+    document.getElementById('bookFilter').value = '';
+    document.getElementById('showNotesCheckbox').checked = true;
     currentSearchQuery = '';
     selectedLetter = null;
+    selectedBookFilter = '';
+    toggleNotesDisplay();
     loadEntries();
 }
 
@@ -901,167 +925,10 @@ async function handleImportNotes(e) {
     }
 }
 
-// Load all notes
+// Reload notes (refreshes the entries view since notes are displayed inline)
 async function loadNotes() {
-    try {
-        const response = await fetch('/api/notes');
-        const data = await response.json();
-        allNotes = data.notes;
-        buildNotesLetterNavigation();
-        displayNotes(allNotes);
-    } catch (error) {
-        showMessage('Error loading notes: ' + error.message, 'error');
-    }
-}
-
-// Refresh notes
-function refreshNotes() {
-    document.getElementById('notesSearchInput').value = '';
-    selectedNotesLetter = null;
-    loadNotes();
-}
-
-// Display notes
-function displayNotes(notes) {
-    const container = document.getElementById('notesList');
-
-    // Apply letter filter
-    let filteredNotes = notes;
-    if (selectedNotesLetter) {
-        filteredNotes = filteredNotes.filter(note => {
-            const firstLetter = normalizeFirstLetter(note.term);
-            return firstLetter === selectedNotesLetter;
-        });
-    }
-
-    if (filteredNotes.length === 0) {
-        container.innerHTML = '<p class="empty-state">No notes found</p>';
-        updateNotesStats(0);
-        return;
-    }
-
-    // Group by first letter
-    const grouped = {};
-    filteredNotes.forEach(note => {
-        const letter = normalizeFirstLetter(note.term);
-        if (!grouped[letter]) {
-            grouped[letter] = [];
-        }
-        grouped[letter].push(note);
-    });
-
-    // Sort letters, but put "#" at the beginning
-    const letters = Object.keys(grouped).sort((a, b) => {
-        if (a === '#') return -1;
-        if (b === '#') return 1;
-        return a.localeCompare(b);
-    });
-
-    // Build HTML with letter headers
-    let html = '';
-    let totalShown = 0;
-
-    letters.forEach(letter => {
-        html += `<div class="letter-group">`;
-        html += `<div class="letter-heading">${letter}</div>`;
-
-        grouped[letter].forEach(note => {
-            totalShown++;
-            html += `<div class="note-item" onclick="editNotes('${escapeHtml(note.term)}', '${escapeHtml(note.notes)}')">`;
-            html += `<div class="note-term">${escapeHtml(note.term)}</div>`;
-            html += `<div class="note-text">${escapeHtml(note.notes)}</div>`;
-            html += `</div>`;
-        });
-
-        html += `</div>`;
-    });
-
-    container.innerHTML = html;
-    updateNotesStats(totalShown);
-}
-
-// Update notes statistics
-function updateNotesStats(count) {
-    const stats = document.getElementById('notesStats');
-    stats.textContent = `Total notes: ${count}`;
-}
-
-// Handle notes search
-function handleNotesSearch(e) {
-    const query = e.target.value.trim();
-
-    // Clear previous timeout
-    if (notesSearchTimeout) {
-        clearTimeout(notesSearchTimeout);
-    }
-
-    // Debounce search
-    notesSearchTimeout = setTimeout(() => {
-        if (query === '') {
-            displayNotes(allNotes);
-        } else {
-            const filtered = allNotes.filter(note =>
-                note.term.toLowerCase().includes(query.toLowerCase()) ||
-                note.notes.toLowerCase().includes(query.toLowerCase())
-            );
-            displayNotes(filtered);
-        }
-        buildNotesLetterNavigation();
-    }, 300);
-}
-
-// Build notes letter navigation
-function buildNotesLetterNavigation() {
-    const navContainer = document.getElementById('notesLetterNav');
-
-    if (!navContainer) return;
-
-    // Apply search if present
-    let notesToNavigate = allNotes;
-    const searchQuery = document.getElementById('notesSearchInput').value.trim();
-
-    if (searchQuery) {
-        notesToNavigate = allNotes.filter(note =>
-            note.term.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            note.notes.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-    }
-
-    // Get all unique first letters from notes
-    const letters = new Set();
-    notesToNavigate.forEach(note => {
-        letters.add(normalizeFirstLetter(note.term));
-    });
-
-    // Sort letters, but put "#" at the beginning
-    const sortedLetters = Array.from(letters).sort((a, b) => {
-        if (a === '#') return -1;
-        if (b === '#') return 1;
-        return a.localeCompare(b);
-    });
-
-    // Build navigation HTML
-    let html = '';
-    sortedLetters.forEach(letter => {
-        const activeClass = letter === selectedNotesLetter ? 'active' : '';
-        html += `<button class="letter-nav-btn ${activeClass}" onclick="filterNotesByLetter('${letter}')">${letter}</button>`;
-    });
-
-    navContainer.innerHTML = html;
-}
-
-// Filter notes by letter
-function filterNotesByLetter(letter) {
-    // Toggle: if clicking the already-selected letter, deselect it to show all
-    if (selectedNotesLetter === letter) {
-        selectedNotesLetter = null;
-    } else {
-        selectedNotesLetter = letter;
-    }
-
-    document.getElementById('notesSearchInput').value = '';
-    buildNotesLetterNavigation();
-    displayNotes(allNotes);
+    // Notes are now displayed inline with entries, so refresh the entries view
+    loadEntries();
 }
 
 // Open edit notes modal
@@ -2069,11 +1936,13 @@ async function loadBookDropdowns() {
         const bookSelect = document.getElementById('book');
         const editBookSelect = document.getElementById('editBook');
         const bookFilter = document.getElementById('bookFilter');
+        const exportBook = document.getElementById('exportBook');
 
         // Clear existing options except the first placeholder
         bookSelect.innerHTML = '<option value="">Book</option>';
         editBookSelect.innerHTML = '<option value="">Book</option>';
         bookFilter.innerHTML = '<option value="">All Books</option>';
+        if (exportBook) exportBook.innerHTML = '<option value="">All Books</option>';
 
         // Add books as options
         data.books.forEach(book => {
@@ -2091,6 +1960,14 @@ async function loadBookDropdowns() {
             option3.value = book.book_number;
             option3.textContent = `Book ${book.book_number}: ${book.book_name}`;
             bookFilter.appendChild(option3);
+
+            // Export dropdown
+            if (exportBook) {
+                const option4 = document.createElement('option');
+                option4.value = book.book_number;
+                option4.textContent = `Book ${book.book_number}: ${book.book_name}`;
+                exportBook.appendChild(option4);
+            }
         });
 
         // Add "Other" option for manual entry (not for filter)
@@ -2107,6 +1984,34 @@ async function loadBookDropdowns() {
     } catch (error) {
         console.error('Error loading book dropdowns:', error);
     }
+}
+
+// Combined export function
+function doExport() {
+    const exportType = document.getElementById('exportType').value;
+    const book = document.getElementById('exportBook').value;
+    let format = document.getElementById('exportFormat').value;
+
+    // Handle format differences between index and notes
+    if (exportType === 'notes' && format === 'plain') {
+        format = 'txt';
+    }
+
+    let url = exportType === 'index' ? `/api/export/${format}` : `/api/notes/export/${format}`;
+    if (book) {
+        url += `?book=${book}`;
+    }
+    window.location.href = url;
+}
+
+// Quick export from View Index page (exports index as PDF with current book filter)
+function quickExport() {
+    const bookFilter = document.getElementById('bookFilter').value;
+    let url = '/api/export/pdf';
+    if (bookFilter) {
+        url += `?book=${bookFilter}`;
+    }
+    window.location.href = url;
 }
 
 // Load books list
@@ -3453,7 +3358,6 @@ function displayGapAnalysis(results) {
         html += `<span class="gap-stat">Total Pages: ${totalPages}</span>`;
         html += `<span class="gap-stat">Indexed Terms: ${result.term_count || 0}</span>`;
         html += `<span class="gap-stat">Term Density: ${termDensity}/100pg</span>`;
-        html += `<span class="gap-stat">Coverage: ${coveragePercent}%</span>`;
         html += `<span class="gap-stat">Gap Ranges: ${gapsCount}</span>`;
         if (exclusionCount > 0) {
             html += `<span class="gap-stat">Exclusion Ranges: ${exclusionCount}</span>`;
@@ -4380,6 +4284,9 @@ async function submitCreateIndex(event) {
             messageDiv.className = 'message success show';
             messageDiv.textContent = 'Index created successfully!';
 
+            // Set flag to show How to Use modal after reload
+            localStorage.setItem('showHowToUse', 'true');
+
             setTimeout(() => {
                 closeCreateIndexModal();
                 window.location.reload();
@@ -4614,6 +4521,9 @@ async function handleGetStarted(event) {
         // Success - close modal and reload
         messageDiv.className = 'message success show';
         messageDiv.textContent = 'Setup complete!';
+
+        // Set flag to show How to Use modal after reload
+        localStorage.setItem('showHowToUse', 'true');
 
         setTimeout(() => {
             closeGetStartedModal();

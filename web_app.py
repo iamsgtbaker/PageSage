@@ -591,10 +591,60 @@ def export_notes(format_type):
     db = get_current_db()
     notes = db.get_all_notes()
 
+    # Get book filter from query parameter
+    book_filter = request.args.get('book', '')
+
     # Get index name for filename
     index_name = db.get_setting('index_name') or 'Book Index'
-    sanitized_name = re.sub(r'[^\w\s-]', '', index_name).strip().replace(' ', '_')
+    color_scheme = db.get_setting('color_scheme') or '#87AE73'
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+    # Gather metadata for PDF export (same as index export)
+    books = db.get_all_books()
+    custom_properties = db.get_all_custom_properties()
+
+    books_with_metadata = []
+    for b in books:
+        book_props = db.get_book_custom_properties(b[0])
+        books_with_metadata.append({
+            'book_number': b[0],
+            'book_name': b[1],
+            'page_count': b[2],
+            'metadata': [{'name': p[1], 'value': p[2]} for p in book_props]
+        })
+
+    # If filtering by specific book, filter notes to only include terms with references from that book
+    selected_book_number = None
+    if book_filter:
+        selected_book_number = int(book_filter)
+        # Get all entries to check which terms have references in this book
+        entries = db.get_all_entries()
+        terms_in_book = set()
+        for term, references in entries:
+            for ref in references:
+                if ref.startswith(f"{selected_book_number}:"):
+                    terms_in_book.add(term.lower())
+                    break
+
+        # Filter notes to only include terms that have references in the selected book
+        notes = [(term, note) for term, note in notes if term.lower() in terms_in_book]
+
+        # Filter metadata to only show the selected book (compare as int)
+        books_with_metadata = [b for b in books_with_metadata if int(b['book_number']) == selected_book_number]
+
+    metadata = {
+        'index_name': index_name,
+        'color_scheme': color_scheme,
+        'books': books_with_metadata,
+        'custom_properties': [{'name': p[1], 'value': p[2]} for p in custom_properties],
+        'single_book': bool(book_filter)
+    }
+
+    # Add book number to filename if filtering by specific book
+    if selected_book_number:
+        sanitized_name = re.sub(r'[^\w\s-]', '', index_name).strip().replace(' ', '_') + f"_Book{selected_book_number}"
+    else:
+        sanitized_name = re.sub(r'[^\w\s-]', '', index_name).strip().replace(' ', '_')
 
     if format_type == 'txt':
         content = formatter.format_notes_text(notes)
@@ -633,7 +683,7 @@ def export_notes(format_type):
         mimetype = 'application/pdf'
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
         temp_file.close()
-        success = formatter.format_notes_pdf(notes, temp_file.name)
+        success = formatter.format_notes_pdf(notes, temp_file.name, metadata)
         if not success:
             return jsonify({'error': 'PDF generation failed. Install reportlab: pip install reportlab'}), 500
     elif format_type == 'excel':
@@ -658,22 +708,61 @@ def export_index(format_type):
     db = get_current_db()
     entries = db.get_all_entries()
 
+    # Get book filter from query parameter
+    book_filter = request.args.get('book', '')
+
     # Gather index metadata
     index_name = db.get_setting('index_name') or 'Book Index'
-    color_scheme = db.get_setting('color_scheme') or '#9ca3af'
+    color_scheme = db.get_setting('color_scheme') or '#87AE73'
     books = db.get_all_books()
     custom_properties = db.get_all_custom_properties()
+
+    books_with_metadata = []
+    for b in books:
+        book_props = db.get_book_custom_properties(b[0])
+        books_with_metadata.append({
+            'book_number': b[0],
+            'book_name': b[1],
+            'page_count': b[2],
+            'metadata': [{'name': p[1], 'value': p[2]} for p in book_props]
+        })
+
+    # If filtering by specific book, filter entries and metadata
+    selected_book_number = None
+    if book_filter:
+        selected_book_number = int(book_filter)
+        # Filter entries to only include references from this book
+        filtered_entries = []
+        for term, references in entries:
+            book_refs = []
+            for ref in references:
+                if ref.startswith(f"{selected_book_number}:"):
+                    # Convert "book:page" to just "page" for single-book export
+                    page_part = ref.split(':', 1)[1]
+                    book_refs.append(page_part)
+            if book_refs:
+                filtered_entries.append((term, book_refs))
+        entries = filtered_entries
+
+        # Filter metadata to only show the selected book (compare as int)
+        books_with_metadata = [b for b in books_with_metadata if int(b['book_number']) == selected_book_number]
 
     metadata = {
         'index_name': index_name,
         'color_scheme': color_scheme,
-        'books': [{'book_number': b[0], 'book_name': b[1], 'page_count': b[2]} for b in books],
-        'custom_properties': [{'name': p[1], 'value': p[2]} for p in custom_properties]
+        'books': books_with_metadata,
+        'custom_properties': [{'name': p[1], 'value': p[2]} for p in custom_properties],
+        'single_book': bool(book_filter)
     }
 
     # Create filename from index name and timestamp
-    sanitized_name = re.sub(r'[^\w\s-]', '', index_name).strip().replace(' ', '_')
+    base_name = re.sub(r'[^\w\s-]', '', index_name).strip().replace(' ', '_')
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    # Add book number to filename if filtering by specific book
+    if selected_book_number:
+        sanitized_name = f"{base_name}_Book{selected_book_number}"
+    else:
+        sanitized_name = base_name
 
     if format_type == 'latex':
         content = formatter.format_latex_style(entries, metadata)
@@ -738,11 +827,11 @@ def get_settings():
         # No database yet - return defaults
         return jsonify({
             'index_name': 'Book Index',
-            'color_scheme': '#9ca3af',
+            'color_scheme': '#87AE73',
             'no_database': True
         })
     index_name = db.get_setting('index_name') or 'Book Index'
-    color_scheme = db.get_setting('color_scheme') or '#9ca3af'
+    color_scheme = db.get_setting('color_scheme') or '#87AE73'
     return jsonify({
         'index_name': index_name,
         'color_scheme': color_scheme

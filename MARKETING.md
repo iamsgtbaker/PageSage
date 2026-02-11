@@ -1,4 +1,4 @@
-# Index it! - The Smart Study Index for Open-Book Exams
+# Page Sage - The Smart Study Index for Open-Book Exams
 
 ## The Open-Book Exam Paradox
 
@@ -33,10 +33,10 @@ Several GitHub tools exist to convert spreadsheets to formatted indexes, but the
 - **Single-purpose** - Only convert, don't help you build or manage the index
 - **No editing capability** - After export, you're back to spreadsheets to make changes
 
-## Where Index it! Excels
+## Where Page Sage Excels
 
 ### 1. **Built for the Entire Workflow**
-Index it! isn't just a converter—it's a complete index management system that covers every phase:
+Page Sage isn't just a converter—it's a complete index management system that covers every phase:
 - **Creation** - Add entries quickly via web UI or command line
 - **Organization** - Automatic alphabetical grouping and duplicate prevention
 - **Search & Review** - Find entries instantly, see all references at a glance
@@ -115,27 +115,27 @@ Never miss a page with intelligent tracking:
 - **Keyboard Shortcuts** - Navigate tabs (1-6), focus search (/), close modals (Esc)
 - **Responsive Design** - Works on desktop and tablet screens
 
-### 11. **AI-Powered Features (Optional)**
+### 11. **AI-Powered Features**
 - **AI Note Generation** - Automatically generate study notes using Claude or ChatGPT
 - **API Key Management** - Secure storage of your AI provider credentials
 - **On-Demand Processing** - Generate notes only when you need them
 
 ### 12. **Zero Learning Curve**
-- **Intuitive interface** - If you can use a web form, you can use Index it!
+- **Intuitive interface** - If you can use a web form, you can use Page Sage
 - **Clear documentation** - QUICKSTART.md gets you running in minutes
 - **Simple reference format** - `1:42` is easier than complex cell formulas
 - **Demo included** - See it working before you build your own
 - **Built-in help** - Keyboard shortcuts and tips accessible anytime
 
 ### 13. **Open Source & Extensible**
-- **MIT License** - Free forever, modify as needed
+- **AGPL-3.0 License** - Free and open source
 - **Python codebase** - Easy to understand and customize
 - **Active development** - Built with real GIAC exam prep experience
 - **No vendor lock-in** - Your data is in a standard SQLite database
 
-## The Index it! Advantage
+## The Page Sage Advantage
 
-| Feature | Excel/Google Sheets | Word Documents | GitHub Scripts | Index it! |
+| Feature | Excel/Google Sheets | Word Documents | GitHub Scripts | Page Sage |
 |---------|-------------------|----------------|----------------|-----------|
 | Duplicate prevention | Manual | Manual | None | Automatic |
 | Real-time search | Basic | Basic | None | Advanced |
@@ -155,7 +155,7 @@ Never miss a page with intelligent tracking:
 **Scenario**: You're preparing for the GSEC (GIAC Security Essentials) exam. You have 5 SANS course books totaling 1,200+ pages, plus separate lab guides and practice tests.
 
 **Week 1-4: Initial Study**
-- Use Index it! web interface during study sessions
+- Use Page Sage web interface during study sessions
 - When you encounter important terms, tools, or concepts: add them immediately
 - Example: See "nmap" on page 237 of Book 3? Add: `nmap | 3:237`
 - Add notes explaining key concepts for later review
@@ -170,7 +170,7 @@ Never miss a page with intelligent tracking:
 **Week 6: Practice Tests**
 - Take GIAC practice tests (timed, open-book)
 - Notice which terms you search for most
-- Use Index it! search to verify entries exist
+- Use Page Sage search to verify entries exist
 - Add missing terms you struggled to find
 
 **Week 7: Index Refinement**
@@ -186,7 +186,7 @@ Never miss a page with intelligent tracking:
 - Backup your database for future reference
 
 **Exam Day**
-- Bring printed copy of your Index it! export
+- Bring printed copy of your Page Sage export
 - Tab sections with alphabet dividers
 - 4-second lookup times instead of 2-minute searches
 - More time for analysis, less time searching
@@ -195,9 +195,9 @@ Never miss a page with intelligent tracking:
 
 This tool was built by someone who's been there—staring at spreadsheets, fighting with formatting, running obscure Python scripts just to generate an index. There had to be a better way.
 
-Index it! is that better way. It's the tool I wish I had when I was preparing for my first GIAC exam.
+Page Sage is that better way. It's the tool I wish I had when I was preparing for my first GIAC exam and credit it with making my last GIAC exam go smooth.
 
-**Your exam success doesn't depend on memorization—it depends on preparation and retrieval speed.** Index it! gives you both.
+**Your exam success doesn't depend on memorization—it depends on preparation and retrieval speed.** Page Sage gives you both.
 
 ---
 
@@ -217,6 +217,6 @@ Index it! is that better way. It's the tool I wish I had when I was preparing fo
 
 See `README.md` for complete documentation and `QUICKSTART.md` for quick reference.
 
-**License**: MIT - Free forever, modify as you wish
+**License**: AGPL-3.0 - Free and open source
 
 **Created for**: SANS/GIAC students, certification candidates, and anyone facing open-book exams with massive reference materials
